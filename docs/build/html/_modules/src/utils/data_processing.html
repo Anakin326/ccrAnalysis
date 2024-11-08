@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.utils.data_processing &#8212; ccrAnalysis  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.utils.data_processing</h1><div class="highlight"><pre>
+<span></span><span class="c1"># src/utils/data_processing.py</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">scipy</span>
+<span class="kn">import</span> <span class="nn">pyproj</span>
+<span class="kn">import</span> <span class="nn">pathlib</span>
+<span class="kn">from</span> <span class="nn">scipy.io</span> <span class="kn">import</span> <span class="n">loadmat</span>
+<span class="kn">from</span> <span class="nn">pyproj</span> <span class="kn">import</span> <span class="n">Transformer</span><span class="p">,</span> <span class="n">Proj</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span> <span class="k">as</span> <span class="n">PathlibPath</span>
+<span class="kn">import</span> <span class="nn">h5py</span>
+
+<span class="c1"># Load and process lidar data</span>
+<div class="viewcode-block" id="load_lidar_data">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.data_processing.load_lidar_data">[docs]</a>
+<span class="k">def</span> <span class="nf">load_lidar_data</span><span class="p">(</span><span class="n">lidar_mat_file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load lidar data from a MAT-file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        lidar_mat_file (str): The path to the MAT-file containing lidar data.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict or None: Loaded MAT-file data if the file exists, otherwise None.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file_path</span> <span class="o">=</span> <span class="n">PathlibPath</span><span class="p">(</span><span class="n">lidar_mat_file</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">scipy</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">loadmat</span><span class="p">(</span><span class="n">lidar_mat_file</span><span class="p">)</span> <span class="k">if</span> <span class="n">file_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+<span class="c1"># Read data from the HDF5 file</span>
+<div class="viewcode-block" id="read_and_transform_data">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.data_processing.read_and_transform_data">[docs]</a>
+<span class="k">def</span> <span class="nf">read_and_transform_data</span><span class="p">(</span><span class="n">h5_file_path</span><span class="p">,</span> <span class="n">gt_num</span><span class="p">,</span> <span class="n">lidar_mat_file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Read ground truth data from an HDF5 file and transform the coordinates from </span>
+<span class="sd">    latitude/longitude to UTM (Universal Transverse Mercator).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        h5_file_path (str): Path to the HDF5 file containing ground truth data.</span>
+<span class="sd">        gt_num (str): Ground truth dataset identifier (group name in the HDF5 file).</span>
+<span class="sd">        lidar_mat_file (str): Path to the MAT-file containing lidar data for UTM correction.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: A tuple containing:</span>
+<span class="sd">            - pd.DataFrame: Corrected ground truth data with UTM coordinates and altitude.</span>
+<span class="sd">            - pd.DataFrame: Original ground truth data with uncorrected UTM coordinates.</span>
+<span class="sd">            - list: UTM corrections [easting correction, northing correction, vertical correction].</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mat_data</span> <span class="o">=</span> <span class="n">load_lidar_data</span><span class="p">(</span><span class="n">lidar_mat_file</span><span class="p">)</span>
+    <span class="n">utm_correction</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">mat_data</span> <span class="k">else</span> <span class="p">[</span><span class="n">eastingCorrection</span><span class="p">,</span> <span class="n">northingCorrection</span><span class="p">,</span> <span class="n">verticalCorrection</span><span class="p">]</span>
+
+    <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">h5_file_path</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">lats</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">file</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;/</span><span class="si">{</span><span class="n">gt_num</span><span class="si">}</span><span class="s1">/heights/lat_ph&#39;</span><span class="p">])</span>
+        <span class="n">lons</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">file</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;/</span><span class="si">{</span><span class="n">gt_num</span><span class="si">}</span><span class="s1">/heights/lon_ph&#39;</span><span class="p">])</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">file</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;/</span><span class="si">{</span><span class="n">gt_num</span><span class="si">}</span><span class="s1">/heights/h_ph&#39;</span><span class="p">])</span>
+
+    <span class="n">track_direction</span> <span class="o">=</span> <span class="s1">&#39;Descending&#39;</span> <span class="k">if</span> <span class="n">lats</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">lats</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="s1">&#39;Ascending&#39;</span>
+
+    <span class="n">transformer</span> <span class="o">=</span> <span class="n">Transformer</span><span class="o">.</span><span class="n">from_proj</span><span class="p">(</span>
+        <span class="n">Proj</span><span class="p">(</span><span class="n">proj</span><span class="o">=</span><span class="s1">&#39;latlong&#39;</span><span class="p">,</span> <span class="n">datum</span><span class="o">=</span><span class="s1">&#39;WGS84&#39;</span><span class="p">),</span>
+        <span class="n">Proj</span><span class="p">(</span><span class="n">proj</span><span class="o">=</span><span class="s1">&#39;utm&#39;</span><span class="p">,</span> <span class="n">zone</span><span class="o">=</span><span class="mi">13</span><span class="p">,</span> <span class="n">datum</span><span class="o">=</span><span class="s1">&#39;WGS84&#39;</span><span class="p">,</span> <span class="n">hemisphere</span><span class="o">=</span><span class="s1">&#39;N&#39;</span><span class="p">)</span>
+    <span class="p">)</span>
+    
+    <span class="n">utme_uncorrected</span><span class="p">,</span> <span class="n">utmn_uncorrected</span> <span class="o">=</span> <span class="n">transformer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">lons</span><span class="p">,</span> <span class="n">lats</span><span class="p">)</span>
+    <span class="n">utme_corrected</span> <span class="o">=</span> <span class="n">utme_uncorrected</span> <span class="o">+</span> <span class="n">utm_correction</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">utmn_corrected</span> <span class="o">=</span> <span class="n">utmn_uncorrected</span> <span class="o">+</span> <span class="n">utm_correction</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">alt_corrected</span> <span class="o">=</span> <span class="n">z</span> <span class="o">+</span> <span class="n">utm_correction</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+    <span class="n">gt_data_corrected</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s1">&#39;UTM Easting&#39;</span><span class="p">:</span> <span class="n">utme_corrected</span><span class="p">,</span>
+        <span class="s1">&#39;UTM Northing&#39;</span><span class="p">:</span> <span class="n">utmn_corrected</span><span class="p">,</span>
+        <span class="s1">&#39;Altitude&#39;</span><span class="p">:</span> <span class="n">alt_corrected</span>
+    <span class="p">})</span>
+    
+    <span class="n">gt_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s1">&#39;gt_x&#39;</span><span class="p">:</span> <span class="n">utme_uncorrected</span><span class="p">,</span>
+        <span class="s1">&#39;gt_y&#39;</span><span class="p">:</span> <span class="n">utmn_uncorrected</span><span class="p">,</span>
+        <span class="s1">&#39;gt_z&#39;</span><span class="p">:</span> <span class="n">z</span><span class="p">,</span>
+        <span class="s1">&#39;gt_trackDirection&#39;</span><span class="p">:</span> <span class="n">track_direction</span>
+    <span class="p">})</span>
+    <span class="k">return</span> <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">utm_correction</span></div>
+
+
+<span class="c1"># Load CCR truth data</span>
+<div class="viewcode-block" id="load_ccr_truth_data">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.data_processing.load_ccr_truth_data">[docs]</a>
+<span class="k">def</span> <span class="nf">load_ccr_truth_data</span><span class="p">(</span><span class="n">region_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load the CCR truth data (cloud calibration reference data) for a specified region.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        region_name (str): The region name, either &#39;wsmr&#39; or &#39;antarctic&#39;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: A DataFrame containing the CCR truth data including coordinates, names, and relative heights.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">current_directory</span> <span class="o">=</span> <span class="n">PathlibPath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span>
+    <span class="n">file_name</span> <span class="o">=</span> <span class="s2">&quot;wsmr_cc_locations_new.mat&quot;</span> <span class="k">if</span> <span class="n">region_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;wsmr&#39;</span> <span class="k">else</span> <span class="s2">&quot;antarctic_cc_locations_new.mat&quot;</span>
+    <span class="n">mat_file_path</span> <span class="o">=</span> <span class="n">current_directory</span> <span class="o">/</span> <span class="s2">&quot;supportFiles&quot;</span> <span class="o">/</span> <span class="n">file_name</span>
+
+    <span class="n">ccr_truth_data</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">loadmat</span><span class="p">(</span><span class="n">mat_file_path</span><span class="p">)</span>
+    
+    <span class="c1"># Initialize variables</span>
+    <span class="n">xlabelStr</span><span class="p">,</span> <span class="n">ylabelStr</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;UTM Easting (m)&#39;</span><span class="p">,</span> <span class="s1">&#39;UTM Northing (m)&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">region_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;wsmr&#39;</span> <span class="k">else</span> <span class="p">(</span><span class="s1">&#39;Polar Stereo X (m)&#39;</span><span class="p">,</span> <span class="s1">&#39;Polar Stereo Y (m)&#39;</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">region_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;wsmr&#39;</span><span class="p">:</span>
+        <span class="n">ccrX</span><span class="p">,</span> <span class="n">ccrY</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrX&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+        <span class="n">ccrNames</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrNames&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">ravel</span><span class="p">()]</span>
+        <span class="n">ccrRelativeHeights</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrRelativeHeights&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">ccr_heights</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrStruct&#39;</span><span class="p">][</span><span class="s1">&#39;height_m&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+        <span class="n">valid_ccrs</span> <span class="o">=</span> <span class="n">ccr_heights</span> <span class="o">!=</span> <span class="mi">0</span>
+        <span class="n">ccrX</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrX&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()[</span><span class="n">valid_ccrs</span><span class="p">]</span>
+        <span class="n">ccrY</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()[</span><span class="n">valid_ccrs</span><span class="p">]</span>
+        <span class="n">ccrNames</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrNames&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="n">valid_ccrs</span><span class="p">]]</span>
+        <span class="n">ccrRelativeHeights</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrRelativeHeights&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s1">&#39;ccrX&#39;</span><span class="p">:</span> <span class="n">ccrX</span><span class="p">,</span>
+        <span class="s1">&#39;ccrY&#39;</span><span class="p">:</span> <span class="n">ccrY</span><span class="p">,</span>
+        <span class="s1">&#39;ccrNames&#39;</span><span class="p">:</span> <span class="n">ccrNames</span><span class="p">,</span>
+        <span class="s1">&#39;xlabelStr&#39;</span><span class="p">:</span> <span class="n">xlabelStr</span><span class="p">,</span>
+        <span class="s1">&#39;ylabelStr&#39;</span><span class="p">:</span> <span class="n">ylabelStr</span><span class="p">,</span>
+        <span class="s1">&#39;ccrRelativeHeights&#39;</span><span class="p">:</span> <span class="n">ccrRelativeHeights</span><span class="p">,</span>
+    <span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="get_interp_x">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.data_processing.get_interp_x">[docs]</a>
+<span class="k">def</span> <span class="nf">get_interp_x</span><span class="p">(</span><span class="n">distPts</span><span class="p">,</span> <span class="n">y2</span><span class="p">,</span> <span class="n">e2_thresh</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform linear interpolation to find the x-values corresponding to a specific y-value threshold.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        distPts (array-like): Array of x-values (distances).</span>
+<span class="sd">        y2 (array-like): Array of y-values.</span>
+<span class="sd">        e2_thresh (float): The threshold value of y to interpolate for.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        np.ndarray: The interpolated x-values corresponding to the e2_thresh.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Combine x and y values into a single array and sort by x values</span>
+    <span class="n">array_in</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">distPts</span><span class="p">,</span> <span class="n">y2</span><span class="p">))</span>
+    <span class="n">array_in_sorted</span> <span class="o">=</span> <span class="n">array_in</span><span class="p">[</span><span class="n">array_in</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">argsort</span><span class="p">()]</span>
+    
+    <span class="n">x_vals</span> <span class="o">=</span> <span class="n">array_in_sorted</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">y_vals</span> <span class="o">=</span> <span class="n">array_in_sorted</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+    
+    <span class="n">x_vals_interp</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y_vals</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">x_val_curr</span> <span class="o">=</span> <span class="n">x_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">x_val_post</span> <span class="o">=</span> <span class="n">x_vals</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">y_val_curr</span> <span class="o">=</span> <span class="n">y_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">y_val_post</span> <span class="o">=</span> <span class="n">y_vals</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        
+        <span class="c1"># Check if e2_thresh is between y_val_curr and y_val_post</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">y_val_curr</span> <span class="o">&lt;=</span> <span class="n">e2_thresh</span> <span class="o">&lt;=</span> <span class="n">y_val_post</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">y_val_post</span> <span class="o">&lt;=</span> <span class="n">e2_thresh</span> <span class="o">&lt;=</span> <span class="n">y_val_curr</span><span class="p">):</span>
+            <span class="c1"># Linear interpolation formula</span>
+            <span class="n">x_interp</span> <span class="o">=</span> <span class="n">x_val_curr</span> <span class="o">+</span> <span class="p">(</span><span class="n">x_val_post</span> <span class="o">-</span> <span class="n">x_val_curr</span><span class="p">)</span> <span class="o">*</span> <span class="p">((</span><span class="n">e2_thresh</span> <span class="o">-</span> <span class="n">y_val_curr</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">y_val_post</span> <span class="o">-</span> <span class="n">y_val_curr</span><span class="p">))</span>
+            <span class="n">x_vals_interp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x_interp</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x_vals_interp</span><span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">ccrAnalysis</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">src</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Anakin Martinez.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

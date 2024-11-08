@@ -7,8 +7,18 @@ from matplotlib.widgets import LassoSelector
 from matplotlib.path import Path
 
 class SelectFromCollection:
-    """Class for lasso selection on scatter plots."""
+    """
+    Class to handle lasso selection on scatter plots to select points.
+    """
     def __init__(self, ax, collection, alpha_other=0.3):
+        """
+        Initialize the lasso selector for scatter plot selection.
+
+        Args:
+            ax (matplotlib.axes.Axes): The axis where the plot is drawn.
+            collection (matplotlib.collections.PathCollection): The scatter plot collection.
+            alpha_other (float): The transparency level for non-selected points (default 0.3).
+        """
         self.canvas = ax.figure.canvas
         self.collection = collection
         self.alpha_other = alpha_other
@@ -23,6 +33,12 @@ class SelectFromCollection:
             self.fc = np.tile(self.fc, (self.Npts, 1))
 
     def onselect(self, verts):
+        """
+        Handle the lasso selection event.
+
+        Args:
+            verts (list of tuple): Vertices of the selected region.
+        """
         path = Path(verts)
         self.ind = np.nonzero(path.contains_points(self.xys))[0]
         self.fc[:, -1] = self.alpha_other
@@ -31,6 +47,9 @@ class SelectFromCollection:
         self.canvas.draw_idle()
 
     def disconnect(self):
+        """
+        Disconnect the lasso selector and restore original point colors.
+        """
         self.lasso.disconnect_events()
         self.fc[:, -1] = 1
         self.collection.set_facecolors(self.fc)
@@ -38,12 +57,32 @@ class SelectFromCollection:
     pass
 
 def makeCircle(x, y, r):
+    """
+    Generate the points for a circle given its center and radius.
+
+    Args:
+        x (float): x-coordinate of the center.
+        y (float): y-coordinate of the center.
+        r (float): Radius of the circle.
+
+    Returns:
+        tuple: Two numpy arrays representing the x and y coordinates of the circle.
+    """
     theta = np.linspace(0, 2 * np.pi, 100)  # Same as MATLAB: th = 0:pi/50:2*pi
     xPts = r * np.cos(theta) + x
     yPts = r * np.sin(theta) + y
     return xPts, yPts
 
 def find_ccr_regions(ccr_data_index):
+    """
+    Assign each entry in the CCR data to a specific region based on the ccNum.
+
+    Args:
+        ccr_data_index (pandas.DataFrame): DataFrame containing the CCR data with 'ccNum' column.
+
+    Returns:
+        pd.DataFrame: DataFrame with each CCR number, assigned region, and region's x/y limits.
+    """
     # Define the region_axes dictionary
     region_axes = { 
         'north': {'x': (367240, 367340), 'y': (3651070, 3651170)},
@@ -80,6 +119,19 @@ def find_ccr_regions(ccr_data_index):
 
 # Plot the data
 def plot_selection_data(gt_data_corrected, gt_data, ccr_truth_data, region_name):
+    """
+    Plot various data related to ground truth, CCR data, and selection regions.
+
+    Args:
+        gt_data_corrected (pandas.DataFrame): Ground truth data with corrected coordinates.
+        gt_data (pandas.DataFrame): Ground truth data with raw coordinates.
+        ccr_truth_data (pandas.DataFrame): Data of CCR truth points.
+        region_name (str): The region name (e.g., 'WSMR') for plotting limits and labels.
+
+    Returns:
+        tuple: Matplotlib figure, axis, and scatter plot object.
+    """
+
     minY, maxY = ccr_truth_data['ccrY'].min() - 20, ccr_truth_data['ccrY'].max() + 20
     minAlt, maxAlt = 1160, 1175
     
@@ -132,6 +184,19 @@ def plot_selection_data(gt_data_corrected, gt_data, ccr_truth_data, region_name)
     return fig, ax1, scatter_plot
 
 def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correction, results, output_dir, plot_data_list):
+    """
+    Plots multiple figures to visualize and analyze the data, including ground truth, CCR data, and error analysis.
+
+    Args:
+        ccr_data_index (pandas.DataFrame): DataFrame containing CCR data including ground truth, ccrNum, and related fields.
+        ccr_truth_data (pandas.DataFrame): DataFrame containing CCR truth data such as coordinates and labels.
+        gt_data_corrected (pandas.DataFrame): DataFrame containing corrected ground track data (e.g., UTM coordinates and altitude).
+        utm_correction (tuple): Tuple of UTM corrections (dx, dy, dz) to apply to CCR data.
+        results (numpy.ndarray): Results array with estimated footprint diameters and associated error metrics.
+        output_dir (str): Directory to save the generated plots.
+        plot_data_list (dict): Dictionary containing plot data for individual CCR returns and other information for histogram plotting.
+
+    """
     # Apply UTM correction to ground track data
     measData_x = gt_data_corrected['UTM Easting']
     measData_y = gt_data_corrected['UTM Northing']
@@ -140,6 +205,7 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
     # Prepare for plotting all CCR and ground data in fig3 and fig4
     ccArray = np.empty((0, 2))
 
+    # Find the regions for each CCR and extract plot limits from the first valid region
     ccNumRegions = find_ccr_regions(ccr_data_index)
     first_valid_region = ccNumRegions['region_axes'].dropna().iloc[0]  # Get the first valid region
     x_limits = first_valid_region['x']
@@ -155,7 +221,7 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
         ccrData[:, 0] = ccrData[:, 0] + utm_correction[1]  # Correcting y
         ccrData[:, 1] = ccrData[:, 1] + utm_correction[2]  # Correcting z
 
-        # Plot Height Data for each CCR in fig2 (separate figures per CCR)
+        # --- Plot 2: Plot Height Data for each CCR ---
         fig2 = plt.figure()
         plt.plot(gt_data_corrected['UTM Northing'], gt_data_corrected['Altitude'], 'y.', label='All Points')
         plt.plot(ccrData[:, 0], ccrData[:, 1], 'r.', label=f'CCR Data (CCR {ccNum})')
@@ -192,7 +258,7 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
         maxCCRy = (max(ccr_truth_data['ccrY']) + 10)
         minCCRy = (min(ccr_truth_data['ccrY']) - 10)
 
-    # Plot all CCRs individually, highlight closest CCR in each iteration
+    # --- Plot 3: Combined Track Plot for All CCRs ---
     fig3 = plt.figure()
     plt.scatter(measData_x, measData_y, color='lime', s=1, label='Ground Track')
     plt.scatter(ccrX_, ccrY_, color='blue', s=1, label='All CCR Returns')
@@ -220,7 +286,7 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
     plt.savefig(os.path.join(output_dir, 'combined_track_plot.png'))
     plt.close(fig3)
 
-    # Plot all CCRs and ground data in a top-view plot in fig4
+    # --- Plot 4: Top-view Plot for All CCRs ---
     fig4 = plt.figure()
     plt.plot(measData_x, measData_y, 'o', color='lime', label='Ground Track')
     plt.plot(ccrX_, ccrY_, 'o', color='blue', label='CCR Returns')
@@ -252,7 +318,7 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
     plt.savefig(os.path.join(output_dir, 'top_view_plot.png'))
     plt.close(fig4)
 
-    # Create a figure and subplots
+    # --- Plot 5: Error Analysis (Cross-Track RMSE, Cross-Track Offset, Along-Track Offset) ---
     fig5, axs = plt.subplots(3, 1, figsize=(12, 9))
 
     min_row_index = np.argmin(results[:, 5])  # Find the index of the minimum value in column index 5
@@ -295,9 +361,8 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
     plt.savefig(os.path.join(output_dir, 'error_analysis_plots.png'))
     plt.close(fig5)
 
-    # Create a new figure
+    # --- Plot 6: Cross-Track RMSE (Single Plot) ---
     fig6 = plt.figure()
-    # Plotting the results
     plt.plot(results[:, 0], results[:, 5], 'b-', label='Cross-Track RMSE')  # 'b-' is the blue line
     # Highlight the minimum row
     p1 = plt.plot(results[min_row_index, 0], results[min_row_index, 5], 'ko', 
@@ -313,6 +378,7 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
     plt.savefig(os.path.join(output_dir, 'cross_track_rmse_analysis.png'))
     plt.close(fig6)  # Close the figure to free memory
 
+    # --- Plot 7: Histogram of CCR Photon Returns ---
     for current_index, plot_data in plot_data_list.items():
         ccNum = plot_data["ccNum"]
         fig7 = plt.figure()

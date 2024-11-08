@@ -2,6 +2,7 @@
 import os
 import time
 import itertools
+
 # Third-party imports
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ import scipy.io
 from scipy import stats
 from scipy.stats import norm
 from scipy.interpolate import interp1d
+
 # Local application/library imports
 from utils.data_processing import load_lidar_data, read_and_transform_data, load_ccr_truth_data, get_interp_x
 from utils.plotting import SelectFromCollection, makeCircle, plot_selection_data, plot_figures, find_ccr_regions
@@ -17,6 +19,24 @@ from utils.file_io import import_from_hdf5, export_to_hdf5
 
 # Handle user selections
 def handle_selections(fig, ax1, scatter_plot, gt_data_corrected, ccr_truth_data):
+    """
+    Handles the selection of points on a scatter plot and stores data for ground and CCR (Control Check Range) points.
+
+    This function allows the user to select points on a plot using the mouse. The user can toggle between selecting 
+    CCR points and Ground points. The function then calculates the difference in height between selected ground points 
+    and their nearest corresponding CCR, storing relevant data for later use.
+
+    Args:
+        fig (matplotlib.figure.Figure): The figure object containing the plot.
+        ax1 (matplotlib.axes.Axes): The axes object for plotting.
+        scatter_plot (matplotlib.collections.PathCollection): The scatter plot from which the user selects points.
+        gt_data_corrected (pandas.DataFrame): Ground truth data for matching selected points.
+        ccr_truth_data (pandas.DataFrame): Data containing known CCR locations and heights.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the stored data for selected CCR and ground points, along with the 
+                          calculated height differences.
+    """
     selector = SelectFromCollection(ax1, scatter_plot)
     all_selected_points = []
     current_selection_type = 0
@@ -33,6 +53,15 @@ def handle_selections(fig, ax1, scatter_plot, gt_data_corrected, ccr_truth_data)
     data_list = []
 
     def accept(event):
+        """
+        Handles the event when the user accepts a selection by pressing the 'Enter' key.
+
+        The function processes the selected points, calculates the height difference between the selected ground and CCR 
+        points, and stores relevant information such as the CCR's location, height, and the calculated height difference.
+
+        Args:
+            event (matplotlib.backend_bases.KeyEvent): The event triggered by the user pressing a key.
+        """
         nonlocal current_selection_type, mean_CCR, mean_Ground, ccrData, groundData, closest_ccr_name, closest_ccr_height, heightDelta, closest_ccr_x, closest_ccr_y
 
         if event.key == "enter":
@@ -98,19 +127,41 @@ def handle_selections(fig, ax1, scatter_plot, gt_data_corrected, ccr_truth_data)
                     except ValueError:
                         print("Error extracting CCR number.")
 
-            selector.disconnect()
-            ax1.set_title("Select CCR points, then ground points.")
-            current_selection_type = 1 - current_selection_type  # Toggle selection type
-            selector.__init__(ax1, scatter_plot)
-            fig.canvas.draw()
+            selector.disconnect()  # Disconnect the selection tool after data is accepted
+            ax1.set_title("Select CCR points, then ground points.")  # Update title
+            current_selection_type = 1 - current_selection_type  # Toggle between selecting CCR and Ground points
+            selector.__init__(ax1, scatter_plot)  # Reinitialize selector for next round of selections
+            fig.canvas.draw()  # Redraw the figure to reflect changes
 
-    fig.canvas.mpl_connect("key_press_event", accept)
-    plt.show()
-    ccr_data_index = pd.DataFrame(data_list)  # Create DataFrame after accepting selections
+    fig.canvas.mpl_connect("key_press_event", accept)  # Connect the 'enter' key press to the accept function
+    plt.show()  # Display the plot
+    ccr_data_index = pd.DataFrame(data_list)  # Convert the collected data into a pandas DataFrame
 
     return ccr_data_index
 
 def get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data, utm_correction):
+    """
+    Calculate the offsets between the ground truth data and the CCR (Control Check Range) data.
+
+    This function processes a set of data points, applies rotation and translation transformations to align
+    the measurement data and CCR data, and then calculates various offsets (cross-track, along-track, easting,
+    and northing) based on the processed data. It returns the results, predicted offsets, and a list of directions.
+
+    Args:
+        ccr_data_index (pandas.DataFrame): DataFrame containing information about CCR data points and their closest match.
+        gt_data (pandas.DataFrame): Ground truth data, including coordinates ('gt_x', 'gt_y', 'gt_z').
+        r_nominal (float): Nominal radius, used in offset calculations.
+        ccr_truth_data (pandas.DataFrame): DataFrame containing true CCR locations.
+        utm_correction (float): UTM correction to apply during calculations.
+
+    Returns:
+        tuple: Contains the following:
+            - results (numpy.ndarray): Array of calculated offset values and RMSE errors.
+            - combo_arrayPred (list): List of predicted combinations of offset data.
+            - cc_Struct_dict (dict): Dictionary of calculated CCR structures indexed by data.
+            - direction (list): List of directions based on the combination results.
+            - plot_data_list (dict): Dictionary containing data for plotting, indexed by data.
+    """
     cc_Struct_dict = {}
     measData_x = gt_data['gt_x'].values
     measData_y = gt_data['gt_y'].values
@@ -121,6 +172,17 @@ def get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data, utm_correctio
     plot_data_list = {}
 
     def rotate_data(data, rotation_point, theta_rad):
+        """
+        Rotate a given set of data points around a specified rotation point by a given angle.
+
+        Args:
+            data (numpy.ndarray): The data points to be rotated, typically of shape (2, N) for 2D points.
+            rotation_point (numpy.ndarray): The point around which to rotate, in the form (x, y).
+            theta_rad (float): The angle in radians by which to rotate the data points.
+
+        Returns:
+            numpy.ndarray: The rotated data points, same shape as the input data.
+        """
         R = np.array([[np.cos(theta_rad), -np.sin(theta_rad)], 
                       [np.sin(theta_rad), np.cos(theta_rad)]])
         return R @ (data - rotation_point[:, None])
@@ -171,6 +233,15 @@ def get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data, utm_correctio
     combo_array, combo_arrayPred = get_combos(cc_Struct_dict, centroidSides, ccrX_truthRot_dict, ccrY_truthRot_dict)
 
     def get_min_combo(array):
+        """
+        Extract the minimum combination and associated shift values from the given array.
+
+        Args:
+            array (list): The list of combinations of data to analyze.
+
+        Returns:
+            tuple: A tuple containing the minimum combination, and the associated cross-track and along-track shifts.
+        """
         min_row = np.argmin([row[44] for row in array])
         return array[min_row][:6], array[min_row][18], array[min_row][19]
 
@@ -179,6 +250,16 @@ def get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data, utm_correctio
 
     # Rotate mean offsets to Easting/Northing frame
     def compute_shift(x_shift, y_shift):
+        """
+        Convert the shifts from the rotated frame back to the original Easting/Northing frame.
+
+        Args:
+            x_shift (float): The shift in the X direction (cross-track).
+            y_shift (float): The shift in the Y direction (along-track).
+
+        Returns:
+            tuple: The Easting and Northing shifts as numpy arrays.
+        """
         return np.linalg.solve(np.array([[np.cos(theta_rad), -np.sin(theta_rad)], 
                                           [np.sin(theta_rad), np.cos(theta_rad)]]), 
                                        np.array([x_shift, y_shift]))
@@ -228,6 +309,28 @@ def get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data, utm_correctio
     ### GET CCRDATA CALL ###
 
 def getCCRdata(ccNum, measData_x, measData_y, ccArray, xRotPt, yRotPt, R, ccrX_truth, ccrY_truth, r_nominal, sigma):
+    """
+    Function to analyze and compare measured chord data with truth data using rotation, Gaussian fitting, 
+    and centroid analysis. The function also calculates circle boundaries based on measured and predicted
+    chord data, along with root mean square errors (RMSE) for centroids.
+
+    Args:
+        ccNum (int): Chord number (identifier).
+        measData_x (np.array): Measured x-coordinates of chord data.
+        measData_y (np.array): Measured y-coordinates of chord data.
+        ccArray (np.array): Array containing chord-related data for filtering.
+        xRotPt (float): X-coordinate of the rotation point.
+        yRotPt (float): Y-coordinate of the rotation point.
+        R (np.array): 2x2 rotation matrix.
+        ccrX_truth (float): Truth x-coordinate of the chord center.
+        ccrY_truth (float): Truth y-coordinate of the chord center.
+        r_nominal (float): Nominal radius used in circle generation.
+        sigma (float): Number of standard deviations for Gaussian fitting.
+
+    Returns:
+        dict: Dictionary containing calculated chord and centroid values, including measured and predicted values.
+        dict: Dictionary containing data for plotting (e.g., Gaussian fit, rotated data points).
+    """
     inds = np.isin(measData_y, ccArray[:,0])
     ccX = measData_x[inds]
     ccY = measData_y[inds]
@@ -456,6 +559,30 @@ def getCCRdata(ccNum, measData_x, measData_y, ccArray, xRotPt, yRotPt, R, ccrX_t
     return cc_Struct, plot_data
 
 def get_combos(cc_Struct_dict, centroidSides, ccrX_truthRot_dict, ccrY_truthRot_dict):
+    """
+    Generate combinations of centroid data for a set of measurements, calculate deltas and residuals, 
+    and compute the RMSE for both measured and predicted centroids.
+
+    Args:
+        cc_Struct_dict (dict): A dictionary where each key corresponds to a measurement index, 
+                                and the value is a dictionary containing centroid data for that measurement.
+                                Each dictionary should have keys like 'xCentroidDeltaLeft', 'xCenterLeftRot', etc.
+        
+        centroidSides (list): A list of strings indicating the sides for which centroid data is considered 
+                               (e.g., ['Left', 'Right']). This will be used to generate combinations of centroids.
+        
+        ccrX_truthRot_dict (dict): A dictionary where each key corresponds to a measurement index, 
+                                   and the value is a list/array containing the true rotated X centroid values for that measurement.
+        
+        ccrY_truthRot_dict (dict): A dictionary where each key corresponds to a measurement index, 
+                                   and the value is a list/array containing the true rotated Y centroid values for that measurement.
+
+    Returns:
+        tuple: A tuple containing two lists:
+            - combo_array (list): A list of lists, where each inner list contains the combination of centroid data for a measurement, 
+                                   along with the calculated deltas and RMSE for measured centroids.
+            - combo_arrayPred (list): A list of lists, similar to `combo_array`, but containing the calculated deltas and RMSE for predicted centroids.
+    """
     # Initialize the combo arrays
     combo_array = []
     combo_arrayPred = []
@@ -525,6 +652,27 @@ def get_combos(cc_Struct_dict, centroidSides, ccrX_truthRot_dict, ccrY_truthRot_
     return combo_array, combo_arrayPred    
 
 def get_footprint(ccr_data_index, gt_data, utm_correction, ccr_truth_data, footprint_range, output_dir):
+    """
+    This function computes and plots footprint information for a set of centroid data (CCR) and Ground Track (GT) data, 
+    using various footprint diameters. The results include both actual and predicted footprints, as well as various 
+    statistical offsets (e.g., Easting, Northing, Cross-Track, Along-Track).
+
+    It generates plots showing the footprint in an Easting/Northing plane and saves the result to a file.
+
+    Args:
+        ccr_data_index (pd.DataFrame): DataFrame containing information about the CCR data, including positions 
+                                        and offsets.
+        gt_data (pd.DataFrame): DataFrame containing the ground track data (easting and northing coordinates).
+        utm_correction (dict): Dictionary containing UTM correction values for the data (not used directly in this code).
+        ccr_truth_data (pd.DataFrame): DataFrame containing the ground truth data for CCR positions and names.
+        footprint_range (str): A string representing the range of footprint diameters in the format 'start:step:end'.
+        output_dir (str): Directory where the resulting plot image will be saved.
+
+    Returns:
+        tuple: A tuple containing:
+            - results (np.ndarray): An array of results for each footprint diameter, containing statistical offsets and RMSE.
+            - plot_data_list (list): A list of data used for plotting, returned from the `get_offset` function.
+    """
     footprint_diameters_str = footprint_range
     start, step, end = map(float, footprint_diameters_str.split(':'))
     footprint_diameters = list(np.arange(start, end + step, step))  # Using NumPy for range generation
@@ -671,6 +819,41 @@ def get_footprint(ccr_data_index, gt_data, utm_correction, ccr_truth_data, footp
 
 #Main function to execute everything
 def full_output(h5_file_path, gt_num, region_name, footprint_range, imported_h5=None, run_select_data=True):
+    """
+    Processes and generates outputs for a specific Ground Track (GT) and Centroid/CCR (Cloud Point) data,
+    including corrections, selection of footprints, and visualization of the results. It optionally reads or
+    imports previous data from a specified HDF5 file.
+
+    This function processes data from an HDF5 file, generates and saves results to an output directory, 
+    and produces plots of the data and results. The output includes footprint diameters, offset computations, 
+    and predicted results, and is saved in a directory based on the date and timestamp. Results are also exported 
+    into an HDF5 file.
+
+    Args:
+        h5_file_path (str): The file path of the HDF5 file containing GT and lidar data.
+        gt_num (int): The ground track number for which the data needs to be processed.
+        region_name (str): The name of the region to be used for truth data related to the CCRs.
+        footprint_range (str): A string defining the range of footprint diameters to be processed, 
+                               in the format 'start:step:end'.
+        imported_h5 (str, optional): The file path of a previously exported HDF5 file containing 
+                                      previous data (e.g., CCR indices). If not provided, data will be processed 
+                                      from scratch.
+        run_select_data (bool, optional): A flag indicating whether to perform full data processing (`True`) 
+                                          or to just import selected data from a prior HDF5 file (`False`).
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the selected CCR indices and other relevant data. 
+                      This is the processed data used for further analysis or export.
+    
+    Process:
+        1. If `run_select_data` is `True`, the function will read and transform the data from the HDF5 file and 
+           perform further data processing such as selecting CCR footprints.
+        2. If `run_select_data` is `False`, it will only import the selected CCR data from the given HDF5 file.
+        3. Data is processed and results are plotted, including offset calculations, predicted CCR footprints, 
+           and statistical comparisons (e.g., RMSE).
+        4. Outputs are saved to a uniquely named directory based on the date and timestamp, and data is exported 
+           back into a new HDF5 file for future use.
+    """
     # Extract the date from the H5 file name
     base_name = os.path.basename(h5_file_path)  # Get the file name from the full path
     date_str = base_name.split('_')[2][:8]  # Extracting date portion for naming

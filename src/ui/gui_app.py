@@ -4,7 +4,31 @@ from get_footprint import full_output
 from tkinter import filedialog, messagebox
 
 class DataProcessingGUI:
+    """
+    A GUI application for data processing related to ground truth and footprint selection.
+
+    This class creates a graphical user interface (GUI) for selecting an HDF5 file, entering parameters 
+    such as Ground Truth Number, Region, and Footprint Range, and then running data selection or 
+    importing previously selected indices for further processing.
+
+    Features:
+        - Allows the user to browse for an HDF5 file.
+        - Input fields for Ground Truth Number, Region Name, and Footprint Range.
+        - Buttons for selecting data or importing indices from an HDF5 file.
+        - Displays success or error messages via messageboxes.
+
+    Methods:
+        - browse_h5_file: Opens a file dialog for the user to select an HDF5 file.
+        - run_select_data: Processes the data with the selected parameters and displays success/error messages.
+        - run_import_indices: Imports selected indices from a chosen HDF5 file and processes the data.
+    """
     def __init__(self, root):
+        """
+        Initializes the GUI components and layout.
+
+        Args:
+            root (tk.Tk): The root Tkinter window for the GUI application.
+        """
         self.root = root
         self.root.title("Data Processing GUI")
 
@@ -52,12 +76,23 @@ class DataProcessingGUI:
 
     # GUI helper functions within the class
     def browse_h5_file(self):
+        """
+        Opens a file dialog to allow the user to browse and select an HDF5 file.
+
+        Updates the entry field with the selected file path.
+        """
         file_path = filedialog.askopenfilename(title="Select HDF5 file", filetypes=[("HDF5 files", "*.h5")])
         if file_path:
             self.entry_h5_file.delete(0, tk.END)  # Clear the current entry
             self.entry_h5_file.insert(0, file_path)  # Insert the selected file path
 
     def run_select_data(self):
+        """
+        Retrieves user input and calls the full_output function to process data selection.
+
+        Displays a success message if the process is completed without error. 
+        Otherwise, displays an error message.
+        """
         h5_file_path = self.entry_h5_file.get()
         gt_num = self.entry_gt_num.get()
         region_name = self.selected_region.get()
@@ -70,6 +105,13 @@ class DataProcessingGUI:
             messagebox.showerror("Error", f"Failed to select data: {str(e)}")
 
     def run_import_indices(self):
+        """
+        Prompts the user to select an HDF5 file with previously imported indices.
+        Calls the full_output function to process data using the imported indices.
+
+        Displays a success message if the process is completed without error. 
+        Otherwise, displays an error message.
+        """
         gt_num = self.entry_gt_num.get()
         region_name = self.selected_region.get()
         footprint_range = self.entry_footprint_range.get()
@@ -89,37 +131,11 @@ class DataProcessingGUI:
 
 # Entry function to start the GUI
 def run_gui():
+    """
+    Starts the Tkinter GUI for data processing.
+
+    This function initializes the main Tkinter window and runs the event loop.
+    """
     root = tk.Tk()
     app = DataProcessingGUI(root)
     root.mainloop()
-
-# def main():
-#     parser = argparse.ArgumentParser(description="Data Processing CLI")
-    
-#     parser.add_argument("h5_file_path", help="Path to the HDF5 file")
-#     parser.add_argument("gt_num", type=int, help="Ground truth number")
-#     parser.add_argument("region_name", choices=["wsmr", "antarctic"], help="Region name")
-#     parser.add_argument("footprint_range", help="Footprint range, e.g., '5:0.1:20'")
-#     parser.add_argument("--imported_h5", help="Path to an imported HDF5 file for indices", default=None)
-
-#     args = parser.parse_args()
-    
-#     # Determine the mode based on the presence of --imported_h5
-#     run_select_data = args.imported_h5 is None
-    
-#     try:
-#         full_output(
-#             h5_file_path=args.h5_file_path,
-#             gt_num=args.gt_num,
-#             region_name=args.region_name,
-#             footprint_range=args.footprint_range,
-#             imported_h5=args.imported_h5,
-#             run_select_data=run_select_data
-#         )
-#         print("Processing completed successfully!")
-#     except Exception as e:
-#         print(f"Error occurred: {str(e)}")
-
-
-# if __name__ == "__main__":
-#     main()
