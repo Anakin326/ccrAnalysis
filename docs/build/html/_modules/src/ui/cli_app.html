@@ -39,6 +39,31 @@
 <div class="viewcode-block" id="run_cli">
 <a class="viewcode-back" href="../../../src.ui.html#src.ui.cli_app.run_cli">[docs]</a>
 <span class="k">def</span> <span class="nf">run_cli</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Command-line interface (CLI) for running the full data processing pipeline.</span>
+<span class="sd">    </span>
+<span class="sd">    This function prompts the user for input values such as file paths, ground truth numbers, </span>
+<span class="sd">    region names, and footprint range, and then calls the `full_output` function to process </span>
+<span class="sd">    the data accordingly. The function handles both full data processing as well as importing </span>
+<span class="sd">    previously selected data indices, depending on user input.</span>
+
+<span class="sd">    The user can choose whether to:</span>
+<span class="sd">    1. Process the data from scratch and perform footprint selection.</span>
+<span class="sd">    2. Import previously selected indices from an HDF5 file for further processing.</span>
+
+<span class="sd">    After processing, the results are generated, visualized, and saved to a uniquely named output directory.</span>
+<span class="sd">    </span>
+<span class="sd">    Functionality:</span>
+<span class="sd">        - Prompts the user for necessary inputs.</span>
+<span class="sd">        - Calls the `full_output` function to run data processing, including footprint calculations.</span>
+<span class="sd">        - Handles errors during the processing and outputs appropriate messages.</span>
+
+<span class="sd">    Exceptions:</span>
+<span class="sd">        - If there is an error during processing, it will display the error message to the user.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Get the H5 file path from the user</span>
     <span class="n">h5_file_path</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">&quot;Enter the path to the H5 file: &quot;</span><span class="p">)</span>
     

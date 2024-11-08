@@ -42,8 +42,18 @@
 <div class="viewcode-block" id="SelectFromCollection">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.plotting.SelectFromCollection">[docs]</a>
 <span class="k">class</span> <span class="nc">SelectFromCollection</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class for lasso selection on scatter plots.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class to handle lasso selection on scatter plots to select points.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">collection</span><span class="p">,</span> <span class="n">alpha_other</span><span class="o">=</span><span class="mf">0.3</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the lasso selector for scatter plot selection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            ax (matplotlib.axes.Axes): The axis where the plot is drawn.</span>
+<span class="sd">            collection (matplotlib.collections.PathCollection): The scatter plot collection.</span>
+<span class="sd">            alpha_other (float): The transparency level for non-selected points (default 0.3).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">canvas</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">collection</span> <span class="o">=</span> <span class="n">collection</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">alpha_other</span> <span class="o">=</span> <span class="n">alpha_other</span>
@@ -60,6 +70,12 @@
 <div class="viewcode-block" id="SelectFromCollection.onselect">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.plotting.SelectFromCollection.onselect">[docs]</a>
     <span class="k">def</span> <span class="nf">onselect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">verts</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handle the lasso selection event.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            verts (list of tuple): Vertices of the selected region.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">verts</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">contains_points</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">xys</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fc</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha_other</span>
@@ -71,6 +87,9 @@
 <div class="viewcode-block" id="SelectFromCollection.disconnect">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.plotting.SelectFromCollection.disconnect">[docs]</a>
     <span class="k">def</span> <span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Disconnect the lasso selector and restore original point colors.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">lasso</span><span class="o">.</span><span class="n">disconnect_events</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fc</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">set_facecolors</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc</span><span class="p">)</span>
@@ -82,6 +101,17 @@
 <div class="viewcode-block" id="makeCircle">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.plotting.makeCircle">[docs]</a>
 <span class="k">def</span> <span class="nf">makeCircle</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate the points for a circle given its center and radius.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        x (float): x-coordinate of the center.</span>
+<span class="sd">        y (float): y-coordinate of the center.</span>
+<span class="sd">        r (float): Radius of the circle.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: Two numpy arrays representing the x and y coordinates of the circle.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>  <span class="c1"># Same as MATLAB: th = 0:pi/50:2*pi</span>
     <span class="n">xPts</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">+</span> <span class="n">x</span>
     <span class="n">yPts</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">+</span> <span class="n">y</span>
@@ -91,6 +121,15 @@
 <div class="viewcode-block" id="find_ccr_regions">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.plotting.find_ccr_regions">[docs]</a>
 <span class="k">def</span> <span class="nf">find_ccr_regions</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Assign each entry in the CCR data to a specific region based on the ccNum.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ccr_data_index (pandas.DataFrame): DataFrame containing the CCR data with &#39;ccNum&#39; column.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: DataFrame with each CCR number, assigned region, and region&#39;s x/y limits.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Define the region_axes dictionary</span>
     <span class="n">region_axes</span> <span class="o">=</span> <span class="p">{</span> 
         <span class="s1">&#39;north&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="p">(</span><span class="mi">367240</span><span class="p">,</span> <span class="mi">367340</span><span class="p">),</span> <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="p">(</span><span class="mi">3651070</span><span class="p">,</span> <span class="mi">3651170</span><span class="p">)},</span>
@@ -130,6 +169,19 @@
 <div class="viewcode-block" id="plot_selection_data">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.plotting.plot_selection_data">[docs]</a>
 <span class="k">def</span> <span class="nf">plot_selection_data</span><span class="p">(</span><span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">region_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plot various data related to ground truth, CCR data, and selection regions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        gt_data_corrected (pandas.DataFrame): Ground truth data with corrected coordinates.</span>
+<span class="sd">        gt_data (pandas.DataFrame): Ground truth data with raw coordinates.</span>
+<span class="sd">        ccr_truth_data (pandas.DataFrame): Data of CCR truth points.</span>
+<span class="sd">        region_name (str): The region name (e.g., &#39;WSMR&#39;) for plotting limits and labels.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: Matplotlib figure, axis, and scatter plot object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">minY</span><span class="p">,</span> <span class="n">maxY</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">-</span> <span class="mi">20</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">+</span> <span class="mi">20</span>
     <span class="n">minAlt</span><span class="p">,</span> <span class="n">maxAlt</span> <span class="o">=</span> <span class="mi">1160</span><span class="p">,</span> <span class="mi">1175</span>
     
@@ -185,6 +237,19 @@
 <div class="viewcode-block" id="plot_figures">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.plotting.plot_figures">[docs]</a>
 <span class="k">def</span> <span class="nf">plot_figures</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">,</span> <span class="n">results</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">plot_data_list</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plots multiple figures to visualize and analyze the data, including ground truth, CCR data, and error analysis.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ccr_data_index (pandas.DataFrame): DataFrame containing CCR data including ground truth, ccrNum, and related fields.</span>
+<span class="sd">        ccr_truth_data (pandas.DataFrame): DataFrame containing CCR truth data such as coordinates and labels.</span>
+<span class="sd">        gt_data_corrected (pandas.DataFrame): DataFrame containing corrected ground track data (e.g., UTM coordinates and altitude).</span>
+<span class="sd">        utm_correction (tuple): Tuple of UTM corrections (dx, dy, dz) to apply to CCR data.</span>
+<span class="sd">        results (numpy.ndarray): Results array with estimated footprint diameters and associated error metrics.</span>
+<span class="sd">        output_dir (str): Directory to save the generated plots.</span>
+<span class="sd">        plot_data_list (dict): Dictionary containing plot data for individual CCR returns and other information for histogram plotting.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Apply UTM correction to ground track data</span>
     <span class="n">measData_x</span> <span class="o">=</span> <span class="n">gt_data_corrected</span><span class="p">[</span><span class="s1">&#39;UTM Easting&#39;</span><span class="p">]</span>
     <span class="n">measData_y</span> <span class="o">=</span> <span class="n">gt_data_corrected</span><span class="p">[</span><span class="s1">&#39;UTM Northing&#39;</span><span class="p">]</span>
@@ -193,6 +258,7 @@
     <span class="c1"># Prepare for plotting all CCR and ground data in fig3 and fig4</span>
     <span class="n">ccArray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
 
+    <span class="c1"># Find the regions for each CCR and extract plot limits from the first valid region</span>
     <span class="n">ccNumRegions</span> <span class="o">=</span> <span class="n">find_ccr_regions</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">)</span>
     <span class="n">first_valid_region</span> <span class="o">=</span> <span class="n">ccNumRegions</span><span class="p">[</span><span class="s1">&#39;region_axes&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Get the first valid region</span>
     <span class="n">x_limits</span> <span class="o">=</span> <span class="n">first_valid_region</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>
@@ -208,7 +274,7 @@
         <span class="n">ccrData</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccrData</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">utm_correction</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Correcting y</span>
         <span class="n">ccrData</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccrData</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">utm_correction</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>  <span class="c1"># Correcting z</span>
 
-        <span class="c1"># Plot Height Data for each CCR in fig2 (separate figures per CCR)</span>
+        <span class="c1"># --- Plot 2: Plot Height Data for each CCR ---</span>
         <span class="n">fig2</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">gt_data_corrected</span><span class="p">[</span><span class="s1">&#39;UTM Northing&#39;</span><span class="p">],</span> <span class="n">gt_data_corrected</span><span class="p">[</span><span class="s1">&#39;Altitude&#39;</span><span class="p">],</span> <span class="s1">&#39;y.&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;All Points&#39;</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ccrData</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">ccrData</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;r.&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;CCR Data (CCR </span><span class="si">{</span><span class="n">ccNum</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
@@ -245,7 +311,7 @@
         <span class="n">maxCCRy</span> <span class="o">=</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="mi">10</span><span class="p">)</span>
         <span class="n">minCCRy</span> <span class="o">=</span> <span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">])</span> <span class="o">-</span> <span class="mi">10</span><span class="p">)</span>
 
-    <span class="c1"># Plot all CCRs individually, highlight closest CCR in each iteration</span>
+    <span class="c1"># --- Plot 3: Combined Track Plot for All CCRs ---</span>
     <span class="n">fig3</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">measData_x</span><span class="p">,</span> <span class="n">measData_y</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;lime&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Ground Track&#39;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">ccrX_</span><span class="p">,</span> <span class="n">ccrY_</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;All CCR Returns&#39;</span><span class="p">)</span>
@@ -273,7 +339,7 @@
     <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;combined_track_plot.png&#39;</span><span class="p">))</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig3</span><span class="p">)</span>
 
-    <span class="c1"># Plot all CCRs and ground data in a top-view plot in fig4</span>
+    <span class="c1"># --- Plot 4: Top-view Plot for All CCRs ---</span>
     <span class="n">fig4</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">measData_x</span><span class="p">,</span> <span class="n">measData_y</span><span class="p">,</span> <span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;lime&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Ground Track&#39;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ccrX_</span><span class="p">,</span> <span class="n">ccrY_</span><span class="p">,</span> <span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;CCR Returns&#39;</span><span class="p">)</span>
@@ -305,7 +371,7 @@
     <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;top_view_plot.png&#39;</span><span class="p">))</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig4</span><span class="p">)</span>
 
-    <span class="c1"># Create a figure and subplots</span>
+    <span class="c1"># --- Plot 5: Error Analysis (Cross-Track RMSE, Cross-Track Offset, Along-Track Offset) ---</span>
     <span class="n">fig5</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">9</span><span class="p">))</span>
 
     <span class="n">min_row_index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">results</span><span class="p">[:,</span> <span class="mi">5</span><span class="p">])</span>  <span class="c1"># Find the index of the minimum value in column index 5</span>
@@ -348,9 +414,8 @@
     <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;error_analysis_plots.png&#39;</span><span class="p">))</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig5</span><span class="p">)</span>
 
-    <span class="c1"># Create a new figure</span>
+    <span class="c1"># --- Plot 6: Cross-Track RMSE (Single Plot) ---</span>
     <span class="n">fig6</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
-    <span class="c1"># Plotting the results</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">results</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">results</span><span class="p">[:,</span> <span class="mi">5</span><span class="p">],</span> <span class="s1">&#39;b-&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Cross-Track RMSE&#39;</span><span class="p">)</span>  <span class="c1"># &#39;b-&#39; is the blue line</span>
     <span class="c1"># Highlight the minimum row</span>
     <span class="n">p1</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="s1">&#39;ko&#39;</span><span class="p">,</span> 
@@ -366,6 +431,7 @@
     <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;cross_track_rmse_analysis.png&#39;</span><span class="p">))</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig6</span><span class="p">)</span>  <span class="c1"># Close the figure to free memory</span>
 
+    <span class="c1"># --- Plot 7: Histogram of CCR Photon Returns ---</span>
     <span class="k">for</span> <span class="n">current_index</span><span class="p">,</span> <span class="n">plot_data</span> <span class="ow">in</span> <span class="n">plot_data_list</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="n">ccNum</span> <span class="o">=</span> <span class="n">plot_data</span><span class="p">[</span><span class="s2">&quot;ccNum&quot;</span><span class="p">]</span>
         <span class="n">fig7</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>

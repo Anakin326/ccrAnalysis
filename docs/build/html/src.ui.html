@@ -43,7 +43,33 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="src.ui.cli_app.run_cli">
 <span class="sig-prename descclassname"><span class="pre">src.ui.cli_app.</span></span><span class="sig-name descname"><span class="pre">run_cli</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/ui/cli_app.html#run_cli"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.ui.cli_app.run_cli" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Command-line interface (CLI) for running the full data processing pipeline.</p>
+<p>This function prompts the user for input values such as file paths, ground truth numbers,
+region names, and footprint range, and then calls the <cite>full_output</cite> function to process
+the data accordingly. The function handles both full data processing as well as importing
+previously selected data indices, depending on user input.</p>
+<p>The user can choose whether to:
+1. Process the data from scratch and perform footprint selection.
+2. Import previously selected indices from an HDF5 file for further processing.</p>
+<p>After processing, the results are generated, visualized, and saved to a uniquely named output directory.</p>
+<dl class="simple">
+<dt>Functionality:</dt><dd><ul class="simple">
+<li><p>Prompts the user for necessary inputs.</p></li>
+<li><p>Calls the <cite>full_output</cite> function to run data processing, including footprint calculations.</p></li>
+<li><p>Handles errors during the processing and outputs appropriate messages.</p></li>
+</ul>
+</dd>
+<dt>Exceptions:</dt><dd><ul class="simple">
+<li><p>If there is an error during processing, it will display the error message to the user.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
 
 </section>
 <section id="module-src.ui.gui_app">
@@ -52,27 +78,69 @@
 <dt class="sig sig-object py" id="src.ui.gui_app.DataProcessingGUI">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.ui.gui_app.</span></span><span class="sig-name descname"><span class="pre">DataProcessingGUI</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">root</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/ui/gui_app.html#DataProcessingGUI"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.ui.gui_app.DataProcessingGUI" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A GUI application for data processing related to ground truth and footprint selection.</p>
+<p>This class creates a graphical user interface (GUI) for selecting an HDF5 file, entering parameters
+such as Ground Truth Number, Region, and Footprint Range, and then running data selection or
+importing previously selected indices for further processing.</p>
+<dl class="simple">
+<dt>Features:</dt><dd><ul class="simple">
+<li><p>Allows the user to browse for an HDF5 file.</p></li>
+<li><p>Input fields for Ground Truth Number, Region Name, and Footprint Range.</p></li>
+<li><p>Buttons for selecting data or importing indices from an HDF5 file.</p></li>
+<li><p>Displays success or error messages via messageboxes.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">-</span> <span class="pre">browse_h5_file</span></span></dt>
+<dd><p>Opens a file dialog for the user to select an HDF5 file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">-</span> <span class="pre">run_select_data</span></span></dt>
+<dd><p>Processes the data with the selected parameters and displays success/error messages.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">-</span> <span class="pre">run_import_indices</span></span></dt>
+<dd><p>Imports selected indices from a chosen HDF5 file and processes the data.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="src.ui.gui_app.DataProcessingGUI.browse_h5_file">
 <span class="sig-name descname"><span class="pre">browse_h5_file</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/ui/gui_app.html#DataProcessingGUI.browse_h5_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.ui.gui_app.DataProcessingGUI.browse_h5_file" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Opens a file dialog to allow the user to browse and select an HDF5 file.</p>
+<p>Updates the entry field with the selected file path.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="src.ui.gui_app.DataProcessingGUI.run_import_indices">
 <span class="sig-name descname"><span class="pre">run_import_indices</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/ui/gui_app.html#DataProcessingGUI.run_import_indices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.ui.gui_app.DataProcessingGUI.run_import_indices" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Prompts the user to select an HDF5 file with previously imported indices.
+Calls the full_output function to process data using the imported indices.</p>
+<p>Displays a success message if the process is completed without error.
+Otherwise, displays an error message.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="src.ui.gui_app.DataProcessingGUI.run_select_data">
 <span class="sig-name descname"><span class="pre">run_select_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/ui/gui_app.html#DataProcessingGUI.run_select_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.ui.gui_app.DataProcessingGUI.run_select_data" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Retrieves user input and calls the full_output function to process data selection.</p>
+<p>Displays a success message if the process is completed without error.
+Otherwise, displays an error message.</p>
+</dd></dl>
 
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.ui.gui_app.run_gui">
 <span class="sig-prename descclassname"><span class="pre">src.ui.gui_app.</span></span><span class="sig-name descname"><span class="pre">run_gui</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/ui/gui_app.html#run_gui"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.ui.gui_app.run_gui" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Starts the Tkinter GUI for data processing.</p>
+<p>This function initializes the main Tkinter window and runs the event loop.</p>
+</dd></dl>
 
 </section>
 <section id="module-src.ui">

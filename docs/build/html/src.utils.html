@@ -42,22 +42,87 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.data_processing.get_interp_x">
 <span class="sig-prename descclassname"><span class="pre">src.utils.data_processing.</span></span><span class="sig-name descname"><span class="pre">get_interp_x</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">distPts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">e2_thresh</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/data_processing.html#get_interp_x"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.data_processing.get_interp_x" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Perform linear interpolation to find the x-values corresponding to a specific y-value threshold.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>distPts</strong> (<em>array-like</em>) – Array of x-values (distances).</p></li>
+<li><p><strong>y2</strong> (<em>array-like</em>) – Array of y-values.</p></li>
+<li><p><strong>e2_thresh</strong> (<em>float</em>) – The threshold value of y to interpolate for.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The interpolated x-values corresponding to the e2_thresh.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.data_processing.load_ccr_truth_data">
 <span class="sig-prename descclassname"><span class="pre">src.utils.data_processing.</span></span><span class="sig-name descname"><span class="pre">load_ccr_truth_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">region_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/data_processing.html#load_ccr_truth_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.data_processing.load_ccr_truth_data" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Load the CCR truth data (cloud calibration reference data) for a specified region.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>region_name</strong> (<em>str</em>) – The region name, either ‘wsmr’ or ‘antarctic’.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame containing the CCR truth data including coordinates, names, and relative heights.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.data_processing.load_lidar_data">
 <span class="sig-prename descclassname"><span class="pre">src.utils.data_processing.</span></span><span class="sig-name descname"><span class="pre">load_lidar_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lidar_mat_file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/data_processing.html#load_lidar_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.data_processing.load_lidar_data" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Load lidar data from a MAT-file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>lidar_mat_file</strong> (<em>str</em>) – The path to the MAT-file containing lidar data.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Loaded MAT-file data if the file exists, otherwise None.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict or None</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.data_processing.read_and_transform_data">
 <span class="sig-prename descclassname"><span class="pre">src.utils.data_processing.</span></span><span class="sig-name descname"><span class="pre">read_and_transform_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">h5_file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gt_num</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lidar_mat_file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/data_processing.html#read_and_transform_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.data_processing.read_and_transform_data" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Read ground truth data from an HDF5 file and transform the coordinates from
+latitude/longitude to UTM (Universal Transverse Mercator).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>h5_file_path</strong> (<em>str</em>) – Path to the HDF5 file containing ground truth data.</p></li>
+<li><p><strong>gt_num</strong> (<em>str</em>) – Ground truth dataset identifier (group name in the HDF5 file).</p></li>
+<li><p><strong>lidar_mat_file</strong> (<em>str</em>) – Path to the MAT-file containing lidar data for UTM correction.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A tuple containing:</dt><dd><ul class="simple">
+<li><p>pd.DataFrame: Corrected ground truth data with UTM coordinates and altitude.</p></li>
+<li><p>pd.DataFrame: Original ground truth data with uncorrected UTM coordinates.</p></li>
+<li><p>list: UTM corrections [easting correction, northing correction, vertical correction].</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
 
 </section>
 <section id="module-src.utils.file_io">
@@ -65,12 +130,40 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.file_io.export_to_hdf5">
 <span class="sig-prename descclassname"><span class="pre">src.utils.file_io.</span></span><span class="sig-name descname"><span class="pre">export_to_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ccr_data_index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ccr_data'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/file_io.html#export_to_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.file_io.export_to_hdf5" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Export a pandas DataFrame to an HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ccr_data_index</strong> (<em>pd.DataFrame</em>) – The DataFrame to export.</p></li>
+<li><p><strong>filename</strong> (<em>str</em>) – Path to the HDF5 file where the data should be saved.</p></li>
+<li><p><strong>key</strong> (<em>str</em>) – The key under which the data will be stored in the HDF5 file (default is ‘ccr_data’).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.file_io.import_from_hdf5">
 <span class="sig-prename descclassname"><span class="pre">src.utils.file_io.</span></span><span class="sig-name descname"><span class="pre">import_from_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ccr_data'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/file_io.html#import_from_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.file_io.import_from_hdf5" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Import data from an HDF5 file into a pandas DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<em>str</em>) – Path to the HDF5 file.</p></li>
+<li><p><strong>key</strong> (<em>str</em>) – The key within the HDF5 file to load the data from (default is ‘ccr_data’).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The DataFrame containing the imported data.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
 
 </section>
 <section id="module-src.utils.plotting">
@@ -79,38 +172,104 @@
 <dt class="sig sig-object py" id="src.utils.plotting.SelectFromCollection">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">SelectFromCollection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha_other</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/plotting.html#SelectFromCollection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.plotting.SelectFromCollection" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<p>Class for lasso selection on scatter plots.</p>
+<p>Class to handle lasso selection on scatter plots to select points.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="src.utils.plotting.SelectFromCollection.disconnect">
 <span class="sig-name descname"><span class="pre">disconnect</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/plotting.html#SelectFromCollection.disconnect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.plotting.SelectFromCollection.disconnect" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Disconnect the lasso selector and restore original point colors.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="src.utils.plotting.SelectFromCollection.onselect">
 <span class="sig-name descname"><span class="pre">onselect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">verts</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/plotting.html#SelectFromCollection.onselect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.plotting.SelectFromCollection.onselect" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Handle the lasso selection event.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>verts</strong> (<em>list</em><em> of </em><em>tuple</em>) – Vertices of the selected region.</p>
+</dd>
+</dl>
+</dd></dl>
 
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.plotting.find_ccr_regions">
 <span class="sig-prename descclassname"><span class="pre">src.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">find_ccr_regions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ccr_data_index</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/plotting.html#find_ccr_regions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.plotting.find_ccr_regions" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Assign each entry in the CCR data to a specific region based on the ccNum.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ccr_data_index</strong> (<em>pandas.DataFrame</em>) – DataFrame containing the CCR data with ‘ccNum’ column.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with each CCR number, assigned region, and region’s x/y limits.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.plotting.makeCircle">
 <span class="sig-prename descclassname"><span class="pre">src.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">makeCircle</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/plotting.html#makeCircle"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.plotting.makeCircle" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Generate the points for a circle given its center and radius.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>float</em>) – x-coordinate of the center.</p></li>
+<li><p><strong>y</strong> (<em>float</em>) – y-coordinate of the center.</p></li>
+<li><p><strong>r</strong> (<em>float</em>) – Radius of the circle.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Two numpy arrays representing the x and y coordinates of the circle.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.plotting.plot_figures">
 <span class="sig-prename descclassname"><span class="pre">src.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_figures</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ccr_data_index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccr_truth_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gt_data_corrected</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">utm_correction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_data_list</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/plotting.html#plot_figures"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.plotting.plot_figures" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Plots multiple figures to visualize and analyze the data, including ground truth, CCR data, and error analysis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ccr_data_index</strong> (<em>pandas.DataFrame</em>) – DataFrame containing CCR data including ground truth, ccrNum, and related fields.</p></li>
+<li><p><strong>ccr_truth_data</strong> (<em>pandas.DataFrame</em>) – DataFrame containing CCR truth data such as coordinates and labels.</p></li>
+<li><p><strong>gt_data_corrected</strong> (<em>pandas.DataFrame</em>) – DataFrame containing corrected ground track data (e.g., UTM coordinates and altitude).</p></li>
+<li><p><strong>utm_correction</strong> (<em>tuple</em>) – Tuple of UTM corrections (dx, dy, dz) to apply to CCR data.</p></li>
+<li><p><strong>results</strong> (<em>numpy.ndarray</em>) – Results array with estimated footprint diameters and associated error metrics.</p></li>
+<li><p><strong>output_dir</strong> (<em>str</em>) – Directory to save the generated plots.</p></li>
+<li><p><strong>plot_data_list</strong> (<em>dict</em>) – Dictionary containing plot data for individual CCR returns and other information for histogram plotting.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.utils.plotting.plot_selection_data">
 <span class="sig-prename descclassname"><span class="pre">src.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_selection_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gt_data_corrected</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gt_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccr_truth_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/utils/plotting.html#plot_selection_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.utils.plotting.plot_selection_data" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Plot various data related to ground truth, CCR data, and selection regions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>gt_data_corrected</strong> (<em>pandas.DataFrame</em>) – Ground truth data with corrected coordinates.</p></li>
+<li><p><strong>gt_data</strong> (<em>pandas.DataFrame</em>) – Ground truth data with raw coordinates.</p></li>
+<li><p><strong>ccr_truth_data</strong> (<em>pandas.DataFrame</em>) – Data of CCR truth points.</p></li>
+<li><p><strong>region_name</strong> (<em>str</em>) – The region name (e.g., ‘WSMR’) for plotting limits and labels.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Matplotlib figure, axis, and scatter plot object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
 
 </section>
 <section id="module-src.utils">

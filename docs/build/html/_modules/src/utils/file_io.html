@@ -39,6 +39,16 @@
 <div class="viewcode-block" id="import_from_hdf5">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.file_io.import_from_hdf5">[docs]</a>
 <span class="k">def</span> <span class="nf">import_from_hdf5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">&#39;ccr_data&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Import data from an HDF5 file into a pandas DataFrame.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        filename (str): Path to the HDF5 file.</span>
+<span class="sd">        key (str): The key within the HDF5 file to load the data from (default is &#39;ccr_data&#39;).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: The DataFrame containing the imported data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">ccr_data_index</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_hdf</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DataFrame imported from </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">ccr_data_index</span></div>
@@ -47,6 +57,17 @@
 <div class="viewcode-block" id="export_to_hdf5">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.file_io.export_to_hdf5">[docs]</a>
 <span class="k">def</span> <span class="nf">export_to_hdf5</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">&#39;ccr_data&#39;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Export a pandas DataFrame to an HDF5 file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ccr_data_index (pd.DataFrame): The DataFrame to export.</span>
+<span class="sd">        filename (str): Path to the HDF5 file where the data should be saved.</span>
+<span class="sd">        key (str): The key under which the data will be stored in the HDF5 file (default is &#39;ccr_data&#39;).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">ccr_data_index</span><span class="o">.</span><span class="n">to_hdf</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">key</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DataFrame exported to </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
 

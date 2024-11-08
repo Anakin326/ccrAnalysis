@@ -35,6 +35,7 @@
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">import</span> <span class="nn">itertools</span>
+
 <span class="c1"># Third-party imports</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
@@ -43,6 +44,7 @@
 <span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
 <span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">norm</span>
 <span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="kn">import</span> <span class="n">interp1d</span>
+
 <span class="c1"># Local application/library imports</span>
 <span class="kn">from</span> <span class="nn">utils.data_processing</span> <span class="kn">import</span> <span class="n">load_lidar_data</span><span class="p">,</span> <span class="n">read_and_transform_data</span><span class="p">,</span> <span class="n">load_ccr_truth_data</span><span class="p">,</span> <span class="n">get_interp_x</span>
 <span class="kn">from</span> <span class="nn">utils.plotting</span> <span class="kn">import</span> <span class="n">SelectFromCollection</span><span class="p">,</span> <span class="n">makeCircle</span><span class="p">,</span> <span class="n">plot_selection_data</span><span class="p">,</span> <span class="n">plot_figures</span><span class="p">,</span> <span class="n">find_ccr_regions</span>
@@ -52,6 +54,24 @@
 <div class="viewcode-block" id="handle_selections">
 <a class="viewcode-back" href="../../src.html#src.get_footprint.handle_selections">[docs]</a>
 <span class="k">def</span> <span class="nf">handle_selections</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span><span class="p">,</span> <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Handles the selection of points on a scatter plot and stores data for ground and CCR (Control Check Range) points.</span>
+
+<span class="sd">    This function allows the user to select points on a plot using the mouse. The user can toggle between selecting </span>
+<span class="sd">    CCR points and Ground points. The function then calculates the difference in height between selected ground points </span>
+<span class="sd">    and their nearest corresponding CCR, storing relevant data for later use.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        fig (matplotlib.figure.Figure): The figure object containing the plot.</span>
+<span class="sd">        ax1 (matplotlib.axes.Axes): The axes object for plotting.</span>
+<span class="sd">        scatter_plot (matplotlib.collections.PathCollection): The scatter plot from which the user selects points.</span>
+<span class="sd">        gt_data_corrected (pandas.DataFrame): Ground truth data for matching selected points.</span>
+<span class="sd">        ccr_truth_data (pandas.DataFrame): Data containing known CCR locations and heights.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pandas.DataFrame: A DataFrame containing the stored data for selected CCR and ground points, along with the </span>
+<span class="sd">                          calculated height differences.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">selector</span> <span class="o">=</span> <span class="n">SelectFromCollection</span><span class="p">(</span><span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span><span class="p">)</span>
     <span class="n">all_selected_points</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">current_selection_type</span> <span class="o">=</span> <span class="mi">0</span>
@@ -68,6 +88,15 @@
     <span class="n">data_list</span> <span class="o">=</span> <span class="p">[]</span>
 
     <span class="k">def</span> <span class="nf">accept</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles the event when the user accepts a selection by pressing the &#39;Enter&#39; key.</span>
+
+<span class="sd">        The function processes the selected points, calculates the height difference between the selected ground and CCR </span>
+<span class="sd">        points, and stores relevant information such as the CCR&#39;s location, height, and the calculated height difference.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            event (matplotlib.backend_bases.KeyEvent): The event triggered by the user pressing a key.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">nonlocal</span> <span class="n">current_selection_type</span><span class="p">,</span> <span class="n">mean_CCR</span><span class="p">,</span> <span class="n">mean_Ground</span><span class="p">,</span> <span class="n">ccrData</span><span class="p">,</span> <span class="n">groundData</span><span class="p">,</span> <span class="n">closest_ccr_name</span><span class="p">,</span> <span class="n">closest_ccr_height</span><span class="p">,</span> <span class="n">heightDelta</span><span class="p">,</span> <span class="n">closest_ccr_x</span><span class="p">,</span> <span class="n">closest_ccr_y</span>
 
         <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;enter&quot;</span><span class="p">:</span>
@@ -133,15 +162,15 @@
                     <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
                         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error extracting CCR number.&quot;</span><span class="p">)</span>
 
-            <span class="n">selector</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
-            <span class="n">ax1</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Select CCR points, then ground points.&quot;</span><span class="p">)</span>
-            <span class="n">current_selection_type</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">current_selection_type</span>  <span class="c1"># Toggle selection type</span>
-            <span class="n">selector</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span><span class="p">)</span>
-            <span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span>
+            <span class="n">selector</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>  <span class="c1"># Disconnect the selection tool after data is accepted</span>
+            <span class="n">ax1</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Select CCR points, then ground points.&quot;</span><span class="p">)</span>  <span class="c1"># Update title</span>
+            <span class="n">current_selection_type</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">current_selection_type</span>  <span class="c1"># Toggle between selecting CCR and Ground points</span>
+            <span class="n">selector</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span><span class="p">)</span>  <span class="c1"># Reinitialize selector for next round of selections</span>
+            <span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span>  <span class="c1"># Redraw the figure to reflect changes</span>
 
-    <span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">mpl_connect</span><span class="p">(</span><span class="s2">&quot;key_press_event&quot;</span><span class="p">,</span> <span class="n">accept</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-    <span class="n">ccr_data_index</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data_list</span><span class="p">)</span>  <span class="c1"># Create DataFrame after accepting selections</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">mpl_connect</span><span class="p">(</span><span class="s2">&quot;key_press_event&quot;</span><span class="p">,</span> <span class="n">accept</span><span class="p">)</span>  <span class="c1"># Connect the &#39;enter&#39; key press to the accept function</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>  <span class="c1"># Display the plot</span>
+    <span class="n">ccr_data_index</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data_list</span><span class="p">)</span>  <span class="c1"># Convert the collected data into a pandas DataFrame</span>
 
     <span class="k">return</span> <span class="n">ccr_data_index</span></div>
 
@@ -149,6 +178,28 @@
 <div class="viewcode-block" id="get_offset">
 <a class="viewcode-back" href="../../src.html#src.get_footprint.get_offset">[docs]</a>
 <span class="k">def</span> <span class="nf">get_offset</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">r_nominal</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the offsets between the ground truth data and the CCR (Control Check Range) data.</span>
+
+<span class="sd">    This function processes a set of data points, applies rotation and translation transformations to align</span>
+<span class="sd">    the measurement data and CCR data, and then calculates various offsets (cross-track, along-track, easting,</span>
+<span class="sd">    and northing) based on the processed data. It returns the results, predicted offsets, and a list of directions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ccr_data_index (pandas.DataFrame): DataFrame containing information about CCR data points and their closest match.</span>
+<span class="sd">        gt_data (pandas.DataFrame): Ground truth data, including coordinates (&#39;gt_x&#39;, &#39;gt_y&#39;, &#39;gt_z&#39;).</span>
+<span class="sd">        r_nominal (float): Nominal radius, used in offset calculations.</span>
+<span class="sd">        ccr_truth_data (pandas.DataFrame): DataFrame containing true CCR locations.</span>
+<span class="sd">        utm_correction (float): UTM correction to apply during calculations.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: Contains the following:</span>
+<span class="sd">            - results (numpy.ndarray): Array of calculated offset values and RMSE errors.</span>
+<span class="sd">            - combo_arrayPred (list): List of predicted combinations of offset data.</span>
+<span class="sd">            - cc_Struct_dict (dict): Dictionary of calculated CCR structures indexed by data.</span>
+<span class="sd">            - direction (list): List of directions based on the combination results.</span>
+<span class="sd">            - plot_data_list (dict): Dictionary containing data for plotting, indexed by data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">cc_Struct_dict</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">measData_x</span> <span class="o">=</span> <span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_x&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
     <span class="n">measData_y</span> <span class="o">=</span> <span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_y&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
@@ -159,6 +210,17 @@
     <span class="n">plot_data_list</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="k">def</span> <span class="nf">rotate_data</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">rotation_point</span><span class="p">,</span> <span class="n">theta_rad</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Rotate a given set of data points around a specified rotation point by a given angle.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data (numpy.ndarray): The data points to be rotated, typically of shape (2, N) for 2D points.</span>
+<span class="sd">            rotation_point (numpy.ndarray): The point around which to rotate, in the form (x, y).</span>
+<span class="sd">            theta_rad (float): The angle in radians by which to rotate the data points.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            numpy.ndarray: The rotated data points, same shape as the input data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)],</span> 
                       <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)]])</span>
         <span class="k">return</span> <span class="n">R</span> <span class="o">@</span> <span class="p">(</span><span class="n">data</span> <span class="o">-</span> <span class="n">rotation_point</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">])</span>
@@ -209,6 +271,15 @@
     <span class="n">combo_array</span><span class="p">,</span> <span class="n">combo_arrayPred</span> <span class="o">=</span> <span class="n">get_combos</span><span class="p">(</span><span class="n">cc_Struct_dict</span><span class="p">,</span> <span class="n">centroidSides</span><span class="p">,</span> <span class="n">ccrX_truthRot_dict</span><span class="p">,</span> <span class="n">ccrY_truthRot_dict</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">get_min_combo</span><span class="p">(</span><span class="n">array</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract the minimum combination and associated shift values from the given array.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            array (list): The list of combinations of data to analyze.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: A tuple containing the minimum combination, and the associated cross-track and along-track shifts.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">min_row</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">([</span><span class="n">row</span><span class="p">[</span><span class="mi">44</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">array</span><span class="p">])</span>
         <span class="k">return</span> <span class="n">array</span><span class="p">[</span><span class="n">min_row</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span> <span class="n">array</span><span class="p">[</span><span class="n">min_row</span><span class="p">][</span><span class="mi">18</span><span class="p">],</span> <span class="n">array</span><span class="p">[</span><span class="n">min_row</span><span class="p">][</span><span class="mi">19</span><span class="p">]</span>
 
@@ -217,6 +288,16 @@
 
     <span class="c1"># Rotate mean offsets to Easting/Northing frame</span>
     <span class="k">def</span> <span class="nf">compute_shift</span><span class="p">(</span><span class="n">x_shift</span><span class="p">,</span> <span class="n">y_shift</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convert the shifts from the rotated frame back to the original Easting/Northing frame.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            x_shift (float): The shift in the X direction (cross-track).</span>
+<span class="sd">            y_shift (float): The shift in the Y direction (along-track).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple: The Easting and Northing shifts as numpy arrays.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)],</span> 
                                           <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)]]),</span> 
                                        <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x_shift</span><span class="p">,</span> <span class="n">y_shift</span><span class="p">]))</span>
@@ -269,6 +350,28 @@
 <div class="viewcode-block" id="getCCRdata">
 <a class="viewcode-back" href="../../src.html#src.get_footprint.getCCRdata">[docs]</a>
 <span class="k">def</span> <span class="nf">getCCRdata</span><span class="p">(</span><span class="n">ccNum</span><span class="p">,</span> <span class="n">measData_x</span><span class="p">,</span> <span class="n">measData_y</span><span class="p">,</span> <span class="n">ccArray</span><span class="p">,</span> <span class="n">xRotPt</span><span class="p">,</span> <span class="n">yRotPt</span><span class="p">,</span> <span class="n">R</span><span class="p">,</span> <span class="n">ccrX_truth</span><span class="p">,</span> <span class="n">ccrY_truth</span><span class="p">,</span> <span class="n">r_nominal</span><span class="p">,</span> <span class="n">sigma</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Function to analyze and compare measured chord data with truth data using rotation, Gaussian fitting, </span>
+<span class="sd">    and centroid analysis. The function also calculates circle boundaries based on measured and predicted</span>
+<span class="sd">    chord data, along with root mean square errors (RMSE) for centroids.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ccNum (int): Chord number (identifier).</span>
+<span class="sd">        measData_x (np.array): Measured x-coordinates of chord data.</span>
+<span class="sd">        measData_y (np.array): Measured y-coordinates of chord data.</span>
+<span class="sd">        ccArray (np.array): Array containing chord-related data for filtering.</span>
+<span class="sd">        xRotPt (float): X-coordinate of the rotation point.</span>
+<span class="sd">        yRotPt (float): Y-coordinate of the rotation point.</span>
+<span class="sd">        R (np.array): 2x2 rotation matrix.</span>
+<span class="sd">        ccrX_truth (float): Truth x-coordinate of the chord center.</span>
+<span class="sd">        ccrY_truth (float): Truth y-coordinate of the chord center.</span>
+<span class="sd">        r_nominal (float): Nominal radius used in circle generation.</span>
+<span class="sd">        sigma (float): Number of standard deviations for Gaussian fitting.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Dictionary containing calculated chord and centroid values, including measured and predicted values.</span>
+<span class="sd">        dict: Dictionary containing data for plotting (e.g., Gaussian fit, rotated data points).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">measData_y</span><span class="p">,</span> <span class="n">ccArray</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">ccX</span> <span class="o">=</span> <span class="n">measData_x</span><span class="p">[</span><span class="n">inds</span><span class="p">]</span>
     <span class="n">ccY</span> <span class="o">=</span> <span class="n">measData_y</span><span class="p">[</span><span class="n">inds</span><span class="p">]</span>
@@ -500,6 +603,30 @@
 <div class="viewcode-block" id="get_combos">
 <a class="viewcode-back" href="../../src.html#src.get_footprint.get_combos">[docs]</a>
 <span class="k">def</span> <span class="nf">get_combos</span><span class="p">(</span><span class="n">cc_Struct_dict</span><span class="p">,</span> <span class="n">centroidSides</span><span class="p">,</span> <span class="n">ccrX_truthRot_dict</span><span class="p">,</span> <span class="n">ccrY_truthRot_dict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate combinations of centroid data for a set of measurements, calculate deltas and residuals, </span>
+<span class="sd">    and compute the RMSE for both measured and predicted centroids.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        cc_Struct_dict (dict): A dictionary where each key corresponds to a measurement index, </span>
+<span class="sd">                                and the value is a dictionary containing centroid data for that measurement.</span>
+<span class="sd">                                Each dictionary should have keys like &#39;xCentroidDeltaLeft&#39;, &#39;xCenterLeftRot&#39;, etc.</span>
+<span class="sd">        </span>
+<span class="sd">        centroidSides (list): A list of strings indicating the sides for which centroid data is considered </span>
+<span class="sd">                               (e.g., [&#39;Left&#39;, &#39;Right&#39;]). This will be used to generate combinations of centroids.</span>
+<span class="sd">        </span>
+<span class="sd">        ccrX_truthRot_dict (dict): A dictionary where each key corresponds to a measurement index, </span>
+<span class="sd">                                   and the value is a list/array containing the true rotated X centroid values for that measurement.</span>
+<span class="sd">        </span>
+<span class="sd">        ccrY_truthRot_dict (dict): A dictionary where each key corresponds to a measurement index, </span>
+<span class="sd">                                   and the value is a list/array containing the true rotated Y centroid values for that measurement.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: A tuple containing two lists:</span>
+<span class="sd">            - combo_array (list): A list of lists, where each inner list contains the combination of centroid data for a measurement, </span>
+<span class="sd">                                   along with the calculated deltas and RMSE for measured centroids.</span>
+<span class="sd">            - combo_arrayPred (list): A list of lists, similar to `combo_array`, but containing the calculated deltas and RMSE for predicted centroids.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Initialize the combo arrays</span>
     <span class="n">combo_array</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">combo_arrayPred</span> <span class="o">=</span> <span class="p">[]</span>
@@ -572,6 +699,27 @@
 <div class="viewcode-block" id="get_footprint">
 <a class="viewcode-back" href="../../src.html#src.get_footprint.get_footprint">[docs]</a>
 <span class="k">def</span> <span class="nf">get_footprint</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">footprint_range</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This function computes and plots footprint information for a set of centroid data (CCR) and Ground Track (GT) data, </span>
+<span class="sd">    using various footprint diameters. The results include both actual and predicted footprints, as well as various </span>
+<span class="sd">    statistical offsets (e.g., Easting, Northing, Cross-Track, Along-Track).</span>
+
+<span class="sd">    It generates plots showing the footprint in an Easting/Northing plane and saves the result to a file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ccr_data_index (pd.DataFrame): DataFrame containing information about the CCR data, including positions </span>
+<span class="sd">                                        and offsets.</span>
+<span class="sd">        gt_data (pd.DataFrame): DataFrame containing the ground track data (easting and northing coordinates).</span>
+<span class="sd">        utm_correction (dict): Dictionary containing UTM correction values for the data (not used directly in this code).</span>
+<span class="sd">        ccr_truth_data (pd.DataFrame): DataFrame containing the ground truth data for CCR positions and names.</span>
+<span class="sd">        footprint_range (str): A string representing the range of footprint diameters in the format &#39;start:step:end&#39;.</span>
+<span class="sd">        output_dir (str): Directory where the resulting plot image will be saved.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: A tuple containing:</span>
+<span class="sd">            - results (np.ndarray): An array of results for each footprint diameter, containing statistical offsets and RMSE.</span>
+<span class="sd">            - plot_data_list (list): A list of data used for plotting, returned from the `get_offset` function.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">footprint_diameters_str</span> <span class="o">=</span> <span class="n">footprint_range</span>
     <span class="n">start</span><span class="p">,</span> <span class="n">step</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">footprint_diameters_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">))</span>
     <span class="n">footprint_diameters</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">+</span> <span class="n">step</span><span class="p">,</span> <span class="n">step</span><span class="p">))</span>  <span class="c1"># Using NumPy for range generation</span>
@@ -721,6 +869,41 @@
 <div class="viewcode-block" id="full_output">
 <a class="viewcode-back" href="../../src.html#src.get_footprint.full_output">[docs]</a>
 <span class="k">def</span> <span class="nf">full_output</span><span class="p">(</span><span class="n">h5_file_path</span><span class="p">,</span> <span class="n">gt_num</span><span class="p">,</span> <span class="n">region_name</span><span class="p">,</span> <span class="n">footprint_range</span><span class="p">,</span> <span class="n">imported_h5</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">run_select_data</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Processes and generates outputs for a specific Ground Track (GT) and Centroid/CCR (Cloud Point) data,</span>
+<span class="sd">    including corrections, selection of footprints, and visualization of the results. It optionally reads or</span>
+<span class="sd">    imports previous data from a specified HDF5 file.</span>
+
+<span class="sd">    This function processes data from an HDF5 file, generates and saves results to an output directory, </span>
+<span class="sd">    and produces plots of the data and results. The output includes footprint diameters, offset computations, </span>
+<span class="sd">    and predicted results, and is saved in a directory based on the date and timestamp. Results are also exported </span>
+<span class="sd">    into an HDF5 file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        h5_file_path (str): The file path of the HDF5 file containing GT and lidar data.</span>
+<span class="sd">        gt_num (int): The ground track number for which the data needs to be processed.</span>
+<span class="sd">        region_name (str): The name of the region to be used for truth data related to the CCRs.</span>
+<span class="sd">        footprint_range (str): A string defining the range of footprint diameters to be processed, </span>
+<span class="sd">                               in the format &#39;start:step:end&#39;.</span>
+<span class="sd">        imported_h5 (str, optional): The file path of a previously exported HDF5 file containing </span>
+<span class="sd">                                      previous data (e.g., CCR indices). If not provided, data will be processed </span>
+<span class="sd">                                      from scratch.</span>
+<span class="sd">        run_select_data (bool, optional): A flag indicating whether to perform full data processing (`True`) </span>
+<span class="sd">                                          or to just import selected data from a prior HDF5 file (`False`).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: A DataFrame containing the selected CCR indices and other relevant data. </span>
+<span class="sd">                      This is the processed data used for further analysis or export.</span>
+<span class="sd">    </span>
+<span class="sd">    Process:</span>
+<span class="sd">        1. If `run_select_data` is `True`, the function will read and transform the data from the HDF5 file and </span>
+<span class="sd">           perform further data processing such as selecting CCR footprints.</span>
+<span class="sd">        2. If `run_select_data` is `False`, it will only import the selected CCR data from the given HDF5 file.</span>
+<span class="sd">        3. Data is processed and results are plotted, including offset calculations, predicted CCR footprints, </span>
+<span class="sd">           and statistical comparisons (e.g., RMSE).</span>
+<span class="sd">        4. Outputs are saved to a uniquely named directory based on the date and timestamp, and data is exported </span>
+<span class="sd">           back into a new HDF5 file for future use.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Extract the date from the H5 file name</span>
     <span class="n">base_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">h5_file_path</span><span class="p">)</span>  <span class="c1"># Get the file name from the full path</span>
     <span class="n">date_str</span> <span class="o">=</span> <span class="n">base_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">2</span><span class="p">][:</span><span class="mi">8</span><span class="p">]</span>  <span class="c1"># Extracting date portion for naming</span>

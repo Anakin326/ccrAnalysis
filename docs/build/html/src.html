@@ -98,32 +98,224 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="src.get_footprint.full_output">
 <span class="sig-prename descclassname"><span class="pre">src.get_footprint.</span></span><span class="sig-name descname"><span class="pre">full_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">h5_file_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gt_num</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">footprint_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">imported_h5</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_select_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/get_footprint.html#full_output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.get_footprint.full_output" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Processes and generates outputs for a specific Ground Track (GT) and Centroid/CCR (Cloud Point) data,
+including corrections, selection of footprints, and visualization of the results. It optionally reads or
+imports previous data from a specified HDF5 file.</p>
+<p>This function processes data from an HDF5 file, generates and saves results to an output directory,
+and produces plots of the data and results. The output includes footprint diameters, offset computations,
+and predicted results, and is saved in a directory based on the date and timestamp. Results are also exported
+into an HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>h5_file_path</strong> (<em>str</em>) – The file path of the HDF5 file containing GT and lidar data.</p></li>
+<li><p><strong>gt_num</strong> (<em>int</em>) – The ground track number for which the data needs to be processed.</p></li>
+<li><p><strong>region_name</strong> (<em>str</em>) – The name of the region to be used for truth data related to the CCRs.</p></li>
+<li><p><strong>footprint_range</strong> (<em>str</em>) – A string defining the range of footprint diameters to be processed,
+in the format ‘start:step:end’.</p></li>
+<li><p><strong>imported_h5</strong> (<em>str</em><em>, </em><em>optional</em>) – The file path of a previously exported HDF5 file containing
+previous data (e.g., CCR indices). If not provided, data will be processed
+from scratch.</p></li>
+<li><p><strong>run_select_data</strong> (<em>bool</em><em>, </em><em>optional</em>) – A flag indicating whether to perform full data processing (<cite>True</cite>)
+or to just import selected data from a prior HDF5 file (<cite>False</cite>).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A DataFrame containing the selected CCR indices and other relevant data.</dt><dd><p>This is the processed data used for further analysis or export.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Process:</dt><dd><ol class="arabic simple">
+<li><p>If <cite>run_select_data</cite> is <cite>True</cite>, the function will read and transform the data from the HDF5 file and
+perform further data processing such as selecting CCR footprints.</p></li>
+<li><p>If <cite>run_select_data</cite> is <cite>False</cite>, it will only import the selected CCR data from the given HDF5 file.</p></li>
+<li><p>Data is processed and results are plotted, including offset calculations, predicted CCR footprints,
+and statistical comparisons (e.g., RMSE).</p></li>
+<li><p>Outputs are saved to a uniquely named directory based on the date and timestamp, and data is exported
+back into a new HDF5 file for future use.</p></li>
+</ol>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.get_footprint.getCCRdata">
 <span class="sig-prename descclassname"><span class="pre">src.get_footprint.</span></span><span class="sig-name descname"><span class="pre">getCCRdata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ccNum</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measData_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measData_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccArray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xRotPt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yRotPt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">R</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccrX_truth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccrY_truth</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r_nominal</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/get_footprint.html#getCCRdata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.get_footprint.getCCRdata" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Function to analyze and compare measured chord data with truth data using rotation, Gaussian fitting,
+and centroid analysis. The function also calculates circle boundaries based on measured and predicted
+chord data, along with root mean square errors (RMSE) for centroids.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ccNum</strong> (<em>int</em>) – Chord number (identifier).</p></li>
+<li><p><strong>measData_x</strong> (<em>np.array</em>) – Measured x-coordinates of chord data.</p></li>
+<li><p><strong>measData_y</strong> (<em>np.array</em>) – Measured y-coordinates of chord data.</p></li>
+<li><p><strong>ccArray</strong> (<em>np.array</em>) – Array containing chord-related data for filtering.</p></li>
+<li><p><strong>xRotPt</strong> (<em>float</em>) – X-coordinate of the rotation point.</p></li>
+<li><p><strong>yRotPt</strong> (<em>float</em>) – Y-coordinate of the rotation point.</p></li>
+<li><p><strong>R</strong> (<em>np.array</em>) – 2x2 rotation matrix.</p></li>
+<li><p><strong>ccrX_truth</strong> (<em>float</em>) – Truth x-coordinate of the chord center.</p></li>
+<li><p><strong>ccrY_truth</strong> (<em>float</em>) – Truth y-coordinate of the chord center.</p></li>
+<li><p><strong>r_nominal</strong> (<em>float</em>) – Nominal radius used in circle generation.</p></li>
+<li><p><strong>sigma</strong> (<em>float</em>) – Number of standard deviations for Gaussian fitting.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary containing calculated chord and centroid values, including measured and predicted values.
+dict: Dictionary containing data for plotting (e.g., Gaussian fit, rotated data points).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.get_footprint.get_combos">
 <span class="sig-prename descclassname"><span class="pre">src.get_footprint.</span></span><span class="sig-name descname"><span class="pre">get_combos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cc_Struct_dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">centroidSides</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccrX_truthRot_dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccrY_truthRot_dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/get_footprint.html#get_combos"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.get_footprint.get_combos" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Generate combinations of centroid data for a set of measurements, calculate deltas and residuals,
+and compute the RMSE for both measured and predicted centroids.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cc_Struct_dict</strong> (<em>dict</em>) – A dictionary where each key corresponds to a measurement index,
+and the value is a dictionary containing centroid data for that measurement.
+Each dictionary should have keys like ‘xCentroidDeltaLeft’, ‘xCenterLeftRot’, etc.</p></li>
+<li><p><strong>centroidSides</strong> (<em>list</em>) – A list of strings indicating the sides for which centroid data is considered
+(e.g., [‘Left’, ‘Right’]). This will be used to generate combinations of centroids.</p></li>
+<li><p><strong>ccrX_truthRot_dict</strong> (<em>dict</em>) – A dictionary where each key corresponds to a measurement index,
+and the value is a list/array containing the true rotated X centroid values for that measurement.</p></li>
+<li><p><strong>ccrY_truthRot_dict</strong> (<em>dict</em>) – A dictionary where each key corresponds to a measurement index,
+and the value is a list/array containing the true rotated Y centroid values for that measurement.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A tuple containing two lists:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt>combo_array (list): A list of lists, where each inner list contains the combination of centroid data for a measurement,</dt><dd><p>along with the calculated deltas and RMSE for measured centroids.</p>
+</dd>
+</dl>
+</li>
+<li><p>combo_arrayPred (list): A list of lists, similar to <cite>combo_array</cite>, but containing the calculated deltas and RMSE for predicted centroids.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.get_footprint.get_footprint">
 <span class="sig-prename descclassname"><span class="pre">src.get_footprint.</span></span><span class="sig-name descname"><span class="pre">get_footprint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ccr_data_index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gt_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">utm_correction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccr_truth_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">footprint_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/get_footprint.html#get_footprint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.get_footprint.get_footprint" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>This function computes and plots footprint information for a set of centroid data (CCR) and Ground Track (GT) data,
+using various footprint diameters. The results include both actual and predicted footprints, as well as various
+statistical offsets (e.g., Easting, Northing, Cross-Track, Along-Track).</p>
+<p>It generates plots showing the footprint in an Easting/Northing plane and saves the result to a file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ccr_data_index</strong> (<em>pd.DataFrame</em>) – DataFrame containing information about the CCR data, including positions
+and offsets.</p></li>
+<li><p><strong>gt_data</strong> (<em>pd.DataFrame</em>) – DataFrame containing the ground track data (easting and northing coordinates).</p></li>
+<li><p><strong>utm_correction</strong> (<em>dict</em>) – Dictionary containing UTM correction values for the data (not used directly in this code).</p></li>
+<li><p><strong>ccr_truth_data</strong> (<em>pd.DataFrame</em>) – DataFrame containing the ground truth data for CCR positions and names.</p></li>
+<li><p><strong>footprint_range</strong> (<em>str</em>) – A string representing the range of footprint diameters in the format ‘start:step:end’.</p></li>
+<li><p><strong>output_dir</strong> (<em>str</em>) – Directory where the resulting plot image will be saved.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A tuple containing:</dt><dd><ul class="simple">
+<li><p>results (np.ndarray): An array of results for each footprint diameter, containing statistical offsets and RMSE.</p></li>
+<li><p>plot_data_list (list): A list of data used for plotting, returned from the <cite>get_offset</cite> function.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.get_footprint.get_offset">
 <span class="sig-prename descclassname"><span class="pre">src.get_footprint.</span></span><span class="sig-name descname"><span class="pre">get_offset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ccr_data_index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gt_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r_nominal</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccr_truth_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">utm_correction</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/get_footprint.html#get_offset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.get_footprint.get_offset" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Calculate the offsets between the ground truth data and the CCR (Control Check Range) data.</p>
+<p>This function processes a set of data points, applies rotation and translation transformations to align
+the measurement data and CCR data, and then calculates various offsets (cross-track, along-track, easting,
+and northing) based on the processed data. It returns the results, predicted offsets, and a list of directions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ccr_data_index</strong> (<em>pandas.DataFrame</em>) – DataFrame containing information about CCR data points and their closest match.</p></li>
+<li><p><strong>gt_data</strong> (<em>pandas.DataFrame</em>) – Ground truth data, including coordinates (‘gt_x’, ‘gt_y’, ‘gt_z’).</p></li>
+<li><p><strong>r_nominal</strong> (<em>float</em>) – Nominal radius, used in offset calculations.</p></li>
+<li><p><strong>ccr_truth_data</strong> (<em>pandas.DataFrame</em>) – DataFrame containing true CCR locations.</p></li>
+<li><p><strong>utm_correction</strong> (<em>float</em>) – UTM correction to apply during calculations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Contains the following:</dt><dd><ul class="simple">
+<li><p>results (numpy.ndarray): Array of calculated offset values and RMSE errors.</p></li>
+<li><p>combo_arrayPred (list): List of predicted combinations of offset data.</p></li>
+<li><p>cc_Struct_dict (dict): Dictionary of calculated CCR structures indexed by data.</p></li>
+<li><p>direction (list): List of directions based on the combination results.</p></li>
+<li><p>plot_data_list (dict): Dictionary containing data for plotting, indexed by data.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.get_footprint.handle_selections">
 <span class="sig-prename descclassname"><span class="pre">src.get_footprint.</span></span><span class="sig-name descname"><span class="pre">handle_selections</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fig</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scatter_plot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gt_data_corrected</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccr_truth_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/get_footprint.html#handle_selections"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.get_footprint.handle_selections" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Handles the selection of points on a scatter plot and stores data for ground and CCR (Control Check Range) points.</p>
+<p>This function allows the user to select points on a plot using the mouse. The user can toggle between selecting
+CCR points and Ground points. The function then calculates the difference in height between selected ground points
+and their nearest corresponding CCR, storing relevant data for later use.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fig</strong> (<em>matplotlib.figure.Figure</em>) – The figure object containing the plot.</p></li>
+<li><p><strong>ax1</strong> (<em>matplotlib.axes.Axes</em>) – The axes object for plotting.</p></li>
+<li><p><strong>scatter_plot</strong> (<em>matplotlib.collections.PathCollection</em>) – The scatter plot from which the user selects points.</p></li>
+<li><p><strong>gt_data_corrected</strong> (<em>pandas.DataFrame</em>) – Ground truth data for matching selected points.</p></li>
+<li><p><strong>ccr_truth_data</strong> (<em>pandas.DataFrame</em>) – Data containing known CCR locations and heights.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A DataFrame containing the stored data for selected CCR and ground points, along with the</dt><dd><p>calculated height differences.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
 
 </section>
 <section id="module-src.main">
@@ -131,7 +323,14 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="src.main.main">
 <span class="sig-prename descclassname"><span class="pre">src.main.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/main.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.main.main" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Main function to run the application in either GUI or CLI mode.
+It checks the command-line arguments or prompts the user to choose
+between the two modes (CLI or GUI).</p>
+<p>If the user provides an argument, it selects the mode based on that.
+If no argument is provided, it prompts the user for input.</p>
+<p>The function then calls the appropriate function (<cite>run_gui()</cite> or <cite>run_cli()</cite>)
+depending on the user’s choice.</p>
+</dd></dl>
 
 </section>
 <section id="module-src">

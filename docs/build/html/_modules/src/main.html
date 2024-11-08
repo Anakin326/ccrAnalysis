@@ -38,6 +38,18 @@
 <div class="viewcode-block" id="main">
 <a class="viewcode-back" href="../../src.html#src.main.main">[docs]</a>
 <span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Main function to run the application in either GUI or CLI mode.</span>
+<span class="sd">    It checks the command-line arguments or prompts the user to choose </span>
+<span class="sd">    between the two modes (CLI or GUI).</span>
+
+<span class="sd">    If the user provides an argument, it selects the mode based on that. </span>
+<span class="sd">    If no argument is provided, it prompts the user for input.</span>
+<span class="sd">    </span>
+<span class="sd">    The function then calls the appropriate function (`run_gui()` or `run_cli()`)</span>
+<span class="sd">    depending on the user&#39;s choice.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="n">mode</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
