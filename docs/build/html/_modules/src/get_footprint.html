@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.get_footprint &#8212; ccrAnalysis  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.get_footprint</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Standard library imports</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="c1"># Third-party imports</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">scipy.io</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">norm</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="kn">import</span> <span class="n">interp1d</span>
+<span class="c1"># Local application/library imports</span>
+<span class="kn">from</span> <span class="nn">utils.data_processing</span> <span class="kn">import</span> <span class="n">load_lidar_data</span><span class="p">,</span> <span class="n">read_and_transform_data</span><span class="p">,</span> <span class="n">load_ccr_truth_data</span><span class="p">,</span> <span class="n">get_interp_x</span>
+<span class="kn">from</span> <span class="nn">utils.plotting</span> <span class="kn">import</span> <span class="n">SelectFromCollection</span><span class="p">,</span> <span class="n">makeCircle</span><span class="p">,</span> <span class="n">plot_selection_data</span><span class="p">,</span> <span class="n">plot_figures</span><span class="p">,</span> <span class="n">find_ccr_regions</span>
+<span class="kn">from</span> <span class="nn">utils.file_io</span> <span class="kn">import</span> <span class="n">import_from_hdf5</span><span class="p">,</span> <span class="n">export_to_hdf5</span>
+
+<span class="c1"># Handle user selections</span>
+<div class="viewcode-block" id="handle_selections">
+<a class="viewcode-back" href="../../src.html#src.get_footprint.handle_selections">[docs]</a>
+<span class="k">def</span> <span class="nf">handle_selections</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span><span class="p">,</span> <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">):</span>
+    <span class="n">selector</span> <span class="o">=</span> <span class="n">SelectFromCollection</span><span class="p">(</span><span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span><span class="p">)</span>
+    <span class="n">all_selected_points</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">current_selection_type</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">mean_CCR</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">mean_Ground</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">ccrData</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">groundData</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">closest_ccr_name</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">closest_ccr_height</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">closest_ccr_index</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">heightDelta</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">closest_ccr_x</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">closest_ccr_y</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">data_list</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="nf">accept</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+        <span class="k">nonlocal</span> <span class="n">current_selection_type</span><span class="p">,</span> <span class="n">mean_CCR</span><span class="p">,</span> <span class="n">mean_Ground</span><span class="p">,</span> <span class="n">ccrData</span><span class="p">,</span> <span class="n">groundData</span><span class="p">,</span> <span class="n">closest_ccr_name</span><span class="p">,</span> <span class="n">closest_ccr_height</span><span class="p">,</span> <span class="n">heightDelta</span><span class="p">,</span> <span class="n">closest_ccr_x</span><span class="p">,</span> <span class="n">closest_ccr_y</span>
+
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;enter&quot;</span><span class="p">:</span>
+            <span class="n">selected_points</span> <span class="o">=</span> <span class="n">selector</span><span class="o">.</span><span class="n">xys</span><span class="p">[</span><span class="n">selector</span><span class="o">.</span><span class="n">ind</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">selected_points</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span>
+
+            <span class="n">selected_utm_northings</span> <span class="o">=</span> <span class="n">selected_points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">matching_rows</span> <span class="o">=</span> <span class="n">gt_data_corrected</span><span class="p">[</span><span class="n">gt_data_corrected</span><span class="p">[</span><span class="s1">&#39;UTM Northing&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">selected_utm_northings</span><span class="p">)]</span>
+            <span class="n">mean_utm_easting</span> <span class="o">=</span> <span class="n">matching_rows</span><span class="p">[</span><span class="s1">&#39;UTM Easting&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+            <span class="n">mean_utm_northing</span> <span class="o">=</span> <span class="n">matching_rows</span><span class="p">[</span><span class="s1">&#39;UTM Northing&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">current_selection_type</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># CCR points</span>
+                <span class="n">mean_CCR</span> <span class="o">=</span> <span class="n">selected_points</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="n">ccrData</span> <span class="o">=</span> <span class="n">selected_points</span>
+                <span class="n">all_selected_points</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;CCR&#39;</span><span class="p">,</span> <span class="n">selected_points</span><span class="p">))</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CCR Selection </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">all_selected_points</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: Mean Altitude: </span><span class="si">{</span><span class="n">mean_CCR</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">current_selection_type</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>  <span class="c1"># Ground points</span>
+                <span class="n">mean_Ground</span> <span class="o">=</span> <span class="n">selected_points</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="n">groundData</span> <span class="o">=</span> <span class="n">selected_points</span>
+                <span class="n">all_selected_points</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;Ground&#39;</span><span class="p">,</span> <span class="n">selected_points</span><span class="p">))</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ground Selection </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">all_selected_points</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: Mean Altitude: </span><span class="si">{</span><span class="n">mean_Ground</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">all_selected_points</span> <span class="ow">and</span> <span class="s1">&#39;CCR&#39;</span> <span class="ow">in</span> <span class="n">all_selected_points</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">][</span><span class="mi">0</span><span class="p">]:</span>  <span class="c1"># Ensure previous selection was a CCR</span>
+                    <span class="n">CCR_Height</span> <span class="o">=</span> <span class="n">mean_CCR</span> <span class="o">-</span> <span class="n">mean_Ground</span>
+                    <span class="n">ccrHeight_ft</span> <span class="o">=</span> <span class="n">CCR_Height</span> <span class="o">*</span> <span class="mf">3.28084</span>
+                    <span class="c1"># Calculate distances to CCRs using the DataFrame</span>
+                    <span class="n">distances_to_ccrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrX&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="n">mean_utm_easting</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span>
+                                                <span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="n">mean_utm_northing</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+                    <span class="n">closest_ccr_index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">distances_to_ccrs</span><span class="p">)</span>
+                    <span class="n">closest_ccr_name</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrNames&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">closest_ccr_index</span><span class="p">]</span>
+                    <span class="n">closest_ccr_height</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrRelativeHeights&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">closest_ccr_index</span><span class="p">]</span>
+                    <span class="n">heightDelta</span> <span class="o">=</span> <span class="n">ccrHeight_ft</span> <span class="o">-</span> <span class="n">closest_ccr_height</span>
+                    <span class="n">heightDeltaSign</span> <span class="o">=</span> <span class="s2">&quot;+&quot;</span> <span class="k">if</span> <span class="n">heightDelta</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="s2">&quot;-&quot;</span>
+                    <span class="n">closest_ccr_x</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrX&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">closest_ccr_index</span><span class="p">]</span>
+                    <span class="n">closest_ccr_y</span> <span class="o">=</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">closest_ccr_index</span><span class="p">]</span>
+                        
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">ccNum</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">closest_ccr_name</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;[]&#39;&quot;</span><span class="p">)[</span><span class="mi">3</span><span class="p">:])</span>  <span class="c1"># Extract number from &#39;CCR123&#39;</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Closest CCR: </span><span class="si">{</span><span class="n">closest_ccr_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Truth Height for </span><span class="si">{</span><span class="n">closest_ccr_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">closest_ccr_height</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Height Delta: </span><span class="si">{</span><span class="n">heightDeltaSign</span><span class="si">}{</span><span class="n">heightDelta</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ccrData</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">MaskedArray</span><span class="p">):</span>
+                            <span class="n">ccrData</span> <span class="o">=</span> <span class="n">ccrData</span><span class="o">.</span><span class="n">filled</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>  <span class="c1"># Fill with NaN or another value if desired</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">groundData</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">MaskedArray</span><span class="p">):</span>
+                            <span class="n">groundData</span> <span class="o">=</span> <span class="n">groundData</span><span class="o">.</span><span class="n">filled</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>  <span class="c1"># Similarly convert groundData</span>
+
+                        <span class="c1"># Store the CCR and ground data for this ccNum</span>
+                        <span class="n">data_list</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                            <span class="s1">&#39;ccrData&#39;</span><span class="p">:</span> <span class="n">ccrData</span><span class="p">,</span>
+                            <span class="s1">&#39;groundData&#39;</span><span class="p">:</span> <span class="n">groundData</span><span class="p">,</span>
+                            <span class="s1">&#39;closest_ccr_name&#39;</span><span class="p">:</span> <span class="n">closest_ccr_name</span><span class="p">,</span>
+                            <span class="s1">&#39;closest_ccr_height&#39;</span><span class="p">:</span> <span class="n">closest_ccr_height</span><span class="p">,</span>
+                            <span class="s1">&#39;heightDelta&#39;</span><span class="p">:</span> <span class="n">heightDelta</span><span class="p">,</span>
+                            <span class="s1">&#39;closest_ccr_index&#39;</span><span class="p">:</span> <span class="n">closest_ccr_index</span><span class="p">,</span>
+                            <span class="s1">&#39;closest_ccr_x&#39;</span><span class="p">:</span> <span class="n">closest_ccr_x</span><span class="p">,</span>
+                            <span class="s1">&#39;closest_ccr_y&#39;</span><span class="p">:</span> <span class="n">closest_ccr_y</span><span class="p">,</span>
+                            <span class="s1">&#39;ccNum&#39;</span><span class="p">:</span> <span class="n">ccNum</span><span class="p">,</span>
+                        <span class="p">})</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Data stored for CCR number </span><span class="si">{</span><span class="n">ccNum</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error extracting CCR number.&quot;</span><span class="p">)</span>
+
+            <span class="n">selector</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+            <span class="n">ax1</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Select CCR points, then ground points.&quot;</span><span class="p">)</span>
+            <span class="n">current_selection_type</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">current_selection_type</span>  <span class="c1"># Toggle selection type</span>
+            <span class="n">selector</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span><span class="p">)</span>
+            <span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span>
+
+    <span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">mpl_connect</span><span class="p">(</span><span class="s2">&quot;key_press_event&quot;</span><span class="p">,</span> <span class="n">accept</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="n">ccr_data_index</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data_list</span><span class="p">)</span>  <span class="c1"># Create DataFrame after accepting selections</span>
+
+    <span class="k">return</span> <span class="n">ccr_data_index</span></div>
+
+
+<div class="viewcode-block" id="get_offset">
+<a class="viewcode-back" href="../../src.html#src.get_footprint.get_offset">[docs]</a>
+<span class="k">def</span> <span class="nf">get_offset</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">r_nominal</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">):</span>
+    <span class="n">cc_Struct_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">measData_x</span> <span class="o">=</span> <span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_x&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">measData_y</span> <span class="o">=</span> <span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_y&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">measData_z</span> <span class="o">=</span> <span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_z&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">ccrX_truthRot_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">ccrY_truthRot_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">plot_data_list</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">rotate_data</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">rotation_point</span><span class="p">,</span> <span class="n">theta_rad</span><span class="p">):</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)],</span> 
+                      <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)]])</span>
+        <span class="k">return</span> <span class="n">R</span> <span class="o">@</span> <span class="p">(</span><span class="n">data</span> <span class="o">-</span> <span class="n">rotation_point</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">])</span>
+
+    <span class="c1"># Populate cc_Struct_dict based on ccr_data_index</span>
+    <span class="k">for</span> <span class="n">current_index</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">ccr_data_index</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="c1"># Extract the necessary data from the DataFrame row</span>
+        <span class="n">ccrData</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;ccrData&#39;</span><span class="p">]</span>
+        <span class="n">closest_ccr_index</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;closest_ccr_index&#39;</span><span class="p">]</span>
+        <span class="n">closest_ccr_x</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;closest_ccr_x&#39;</span><span class="p">]</span>
+        <span class="n">closest_ccr_y</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;closest_ccr_y&#39;</span><span class="p">]</span>
+        <span class="n">ccNum</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;ccNum&#39;</span><span class="p">]</span>
+        
+        <span class="c1"># Get linear fit and rotation parameters</span>
+        <span class="n">gt2PolyFit</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">measData_x</span><span class="p">,</span> <span class="n">measData_y</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">slope</span><span class="p">,</span> <span class="n">yInt</span> <span class="o">=</span> <span class="n">gt2PolyFit</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">gt2PolyFit</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">x1</span><span class="p">,</span> <span class="n">x2</span> <span class="o">=</span> <span class="n">measData_x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">measData_x</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">y1</span><span class="p">,</span> <span class="n">y2</span> <span class="o">=</span> <span class="n">slope</span> <span class="o">*</span> <span class="n">x1</span> <span class="o">+</span> <span class="n">yInt</span><span class="p">,</span> <span class="n">slope</span> <span class="o">*</span> <span class="n">x2</span> <span class="o">+</span> <span class="n">yInt</span>
+        <span class="n">deltaX</span><span class="p">,</span> <span class="n">deltaY</span> <span class="o">=</span> <span class="n">x2</span> <span class="o">-</span> <span class="n">x1</span><span class="p">,</span> <span class="n">y2</span> <span class="o">-</span> <span class="n">y1</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">deltaY</span><span class="p">,</span> <span class="n">deltaX</span><span class="p">))</span>
+
+        <span class="c1"># Translate GT2R line to (0,0) and Rotate GT2 strong beam line to be vertical</span>
+        <span class="n">yRotPt</span> <span class="o">=</span> <span class="n">measData_y</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">xRotPt</span> <span class="o">=</span> <span class="p">(</span><span class="n">yRotPt</span> <span class="o">-</span> <span class="n">yInt</span><span class="p">)</span> <span class="o">/</span> <span class="n">slope</span>
+        <span class="n">theta_rad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="mi">90</span> <span class="o">-</span> <span class="n">phi</span><span class="p">)</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)]])</span>
+        
+        <span class="c1"># Rotate measurements and CCR data</span>
+        <span class="n">measData_rotated</span> <span class="o">=</span> <span class="n">rotate_data</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">measData_x</span><span class="p">,</span> <span class="n">measData_y</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">xRotPt</span><span class="p">,</span> <span class="n">yRotPt</span><span class="p">]),</span> <span class="n">theta_rad</span><span class="p">)</span>
+        <span class="n">ccr_truth_rot</span> <span class="o">=</span> <span class="n">rotate_data</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">closest_ccr_x</span><span class="p">,</span> <span class="n">closest_ccr_y</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">xRotPt</span><span class="p">,</span> <span class="n">yRotPt</span><span class="p">]),</span> <span class="n">theta_rad</span><span class="p">)</span>
+
+        <span class="n">ccrX_truthRot_dict</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccr_truth_rot</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">ccrY_truthRot_dict</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccr_truth_rot</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1">#Rotate all CCR points</span>
+        <span class="n">ccr_rot</span> <span class="o">=</span> <span class="n">R</span> <span class="o">@</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrX&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="n">xRotPt</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="n">yRotPt</span><span class="p">])</span>
+        <span class="n">ccrX_Rot</span><span class="p">,</span> <span class="n">ccrY_Rot</span> <span class="o">=</span> <span class="n">ccr_rot</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:],</span> <span class="n">ccr_rot</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+
+        <span class="n">ccArray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">ccArray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">ccArray</span><span class="p">,</span> <span class="n">ccrData</span><span class="p">))</span>
+        
+        <span class="n">cc_Struct</span><span class="p">,</span> <span class="n">plot_data</span> <span class="o">=</span> <span class="n">getCCRdata</span><span class="p">(</span><span class="n">ccNum</span><span class="p">,</span> <span class="n">measData_x</span><span class="p">,</span> <span class="n">measData_y</span><span class="p">,</span> <span class="n">ccArray</span><span class="p">,</span> <span class="n">xRotPt</span><span class="p">,</span> <span class="n">yRotPt</span><span class="p">,</span> <span class="n">R</span><span class="p">,</span> <span class="n">closest_ccr_x</span><span class="p">,</span> <span class="n">closest_ccr_y</span><span class="p">,</span> <span class="n">r_nominal</span><span class="p">,</span> <span class="n">sigma</span><span class="p">)</span>
+        <span class="n">plot_data</span><span class="p">[</span><span class="s2">&quot;ccNum&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccNum</span>
+        <span class="n">cc_Struct_dict</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">cc_Struct</span>
+        <span class="n">plot_data_list</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">plot_data</span>
+
+    <span class="n">centroidSides</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Right&#39;</span><span class="p">,</span> <span class="s1">&#39;Left&#39;</span><span class="p">]</span>
+    <span class="n">combo_array</span><span class="p">,</span> <span class="n">combo_arrayPred</span> <span class="o">=</span> <span class="n">get_combos</span><span class="p">(</span><span class="n">cc_Struct_dict</span><span class="p">,</span> <span class="n">centroidSides</span><span class="p">,</span> <span class="n">ccrX_truthRot_dict</span><span class="p">,</span> <span class="n">ccrY_truthRot_dict</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_min_combo</span><span class="p">(</span><span class="n">array</span><span class="p">):</span>
+        <span class="n">min_row</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">([</span><span class="n">row</span><span class="p">[</span><span class="mi">44</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">array</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">array</span><span class="p">[</span><span class="n">min_row</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span> <span class="n">array</span><span class="p">[</span><span class="n">min_row</span><span class="p">][</span><span class="mi">18</span><span class="p">],</span> <span class="n">array</span><span class="p">[</span><span class="n">min_row</span><span class="p">][</span><span class="mi">19</span><span class="p">]</span>
+
+    <span class="n">min_combo_pred</span><span class="p">,</span> <span class="n">min_x_shift_pred</span><span class="p">,</span> <span class="n">min_y_shift_pred</span> <span class="o">=</span> <span class="n">get_min_combo</span><span class="p">(</span><span class="n">combo_arrayPred</span><span class="p">)</span>
+    <span class="n">min_combo</span><span class="p">,</span> <span class="n">min_x_shift</span><span class="p">,</span> <span class="n">min_y_shift</span> <span class="o">=</span> <span class="n">get_min_combo</span><span class="p">(</span><span class="n">combo_array</span><span class="p">)</span>
+
+    <span class="c1"># Rotate mean offsets to Easting/Northing frame</span>
+    <span class="k">def</span> <span class="nf">compute_shift</span><span class="p">(</span><span class="n">x_shift</span><span class="p">,</span> <span class="n">y_shift</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)],</span> 
+                                          <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta_rad</span><span class="p">)]]),</span> 
+                                       <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x_shift</span><span class="p">,</span> <span class="n">y_shift</span><span class="p">]))</span>
+
+    <span class="n">e_shift</span><span class="p">,</span> <span class="n">n_shift</span> <span class="o">=</span> <span class="n">compute_shift</span><span class="p">(</span><span class="n">min_x_shift</span><span class="p">,</span> <span class="n">min_y_shift</span><span class="p">)</span>
+    <span class="n">e_shift_pred</span><span class="p">,</span> <span class="n">n_shift_pred</span> <span class="o">=</span> <span class="n">compute_shift</span><span class="p">(</span><span class="n">min_x_shift_pred</span><span class="p">,</span> <span class="n">min_y_shift_pred</span><span class="p">)</span>
+
+    <span class="c1"># Get centroid error RMSE values</span>
+    <span class="n">min_row</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">([</span><span class="n">row</span><span class="p">[</span><span class="mi">44</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">combo_array</span><span class="p">])</span>
+    <span class="n">min_row_pred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">([</span><span class="n">row</span><span class="p">[</span><span class="mi">44</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">combo_arrayPred</span><span class="p">])</span>
+    <span class="n">x_centroid_error_rmse</span> <span class="o">=</span> <span class="n">combo_array</span><span class="p">[</span><span class="n">min_row</span><span class="p">][</span><span class="mi">44</span><span class="p">]</span>
+    <span class="n">y_centroid_error_rmse</span> <span class="o">=</span> <span class="n">combo_array</span><span class="p">[</span><span class="n">min_row</span><span class="p">][</span><span class="mi">45</span><span class="p">]</span>
+    <span class="n">x_centroid_error_pred_rmse</span> <span class="o">=</span> <span class="n">combo_arrayPred</span><span class="p">[</span><span class="n">min_row_pred</span><span class="p">][</span><span class="mi">44</span><span class="p">]</span>
+    <span class="n">y_centroid_error_pred_rmse</span> <span class="o">=</span> <span class="n">combo_arrayPred</span><span class="p">[</span><span class="n">min_row_pred</span><span class="p">][</span><span class="mi">45</span><span class="p">]</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+    <span class="mi">2</span> <span class="o">*</span> <span class="n">r_nominal</span><span class="p">,</span>         <span class="c1"># Diameter (nominal)</span>
+    <span class="n">e_shift_pred</span><span class="p">,</span>         <span class="c1"># Predicted Easting shift</span>
+    <span class="n">n_shift_pred</span><span class="p">,</span>         <span class="c1"># Predicted Northing shift</span>
+    <span class="n">min_x_shift_pred</span><span class="p">,</span>         <span class="c1"># Predicted Cross-Track shift</span>
+    <span class="n">min_y_shift_pred</span><span class="p">,</span>         <span class="c1"># Predicted Along-Track shift</span>
+    <span class="n">x_centroid_error_pred_rmse</span><span class="p">,</span>  <span class="c1"># RMSE for Cross-Track error prediction</span>
+    <span class="n">y_centroid_error_pred_rmse</span>   <span class="c1"># RMSE for Along-Track error prediction</span>
+    <span class="p">])</span>
+    
+    <span class="c1"># Initialize direction list</span>
+    <span class="n">direction</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">combo</span> <span class="ow">in</span> <span class="n">min_combo_pred</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">combo</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># Check if combo is not None</span>
+            <span class="n">str_splits</span> <span class="o">=</span> <span class="n">combo</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">)</span>  <span class="c1"># Splitting the string by &#39;*&#39;</span>
+            <span class="n">direction</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">str_splits</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># Store the second part (direction)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">direction</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># Append None or handle as needed</span>
+
+    <span class="c1"># Print output</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Measured Cross-Track Offset: </span><span class="si">{</span><span class="n">min_x_shift</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m (RMSE: </span><span class="si">{</span><span class="n">x_centroid_error_rmse</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m)&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Measured Along-Track Offset: </span><span class="si">{</span><span class="n">min_y_shift</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m (RMSE: </span><span class="si">{</span><span class="n">y_centroid_error_rmse</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m)</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Statistical Cross-Track Offset: </span><span class="si">{</span><span class="n">min_x_shift_pred</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m (RMSE: </span><span class="si">{</span><span class="n">x_centroid_error_pred_rmse</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m)&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Statistical Along-Track Offset: </span><span class="si">{</span><span class="n">min_y_shift_pred</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m (RMSE: </span><span class="si">{</span><span class="n">y_centroid_error_pred_rmse</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m)</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Measured Easting Offset: </span><span class="si">{</span><span class="n">e_shift</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Measured Northing Offset: </span><span class="si">{</span><span class="n">n_shift</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Statistical Easting Offset: </span><span class="si">{</span><span class="n">e_shift_pred</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Statistical Northing Offset: </span><span class="si">{</span><span class="n">n_shift_pred</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> m</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span><span class="p">,</span> <span class="n">combo_arrayPred</span><span class="p">,</span> <span class="n">cc_Struct_dict</span><span class="p">,</span> <span class="n">direction</span><span class="p">,</span> <span class="n">plot_data_list</span></div>
+
+
+    <span class="c1">### GET CCRDATA CALL ###</span>
+
+<div class="viewcode-block" id="getCCRdata">
+<a class="viewcode-back" href="../../src.html#src.get_footprint.getCCRdata">[docs]</a>
+<span class="k">def</span> <span class="nf">getCCRdata</span><span class="p">(</span><span class="n">ccNum</span><span class="p">,</span> <span class="n">measData_x</span><span class="p">,</span> <span class="n">measData_y</span><span class="p">,</span> <span class="n">ccArray</span><span class="p">,</span> <span class="n">xRotPt</span><span class="p">,</span> <span class="n">yRotPt</span><span class="p">,</span> <span class="n">R</span><span class="p">,</span> <span class="n">ccrX_truth</span><span class="p">,</span> <span class="n">ccrY_truth</span><span class="p">,</span> <span class="n">r_nominal</span><span class="p">,</span> <span class="n">sigma</span><span class="p">):</span>
+    <span class="n">inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">measData_y</span><span class="p">,</span> <span class="n">ccArray</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">ccX</span> <span class="o">=</span> <span class="n">measData_x</span><span class="p">[</span><span class="n">inds</span><span class="p">]</span>
+    <span class="n">ccY</span> <span class="o">=</span> <span class="n">measData_y</span><span class="p">[</span><span class="n">inds</span><span class="p">]</span>
+
+    <span class="c1"># Perform rotation assuming R is a 2x2 rotation matrix</span>
+    <span class="n">ccXY</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">ccX</span> <span class="o">-</span> <span class="n">xRotPt</span><span class="p">,</span> <span class="n">ccY</span> <span class="o">-</span> <span class="n">yRotPt</span><span class="p">])</span>
+    <span class="n">ccXYrot</span> <span class="o">=</span> <span class="n">R</span> <span class="o">@</span> <span class="n">ccXY</span>
+    <span class="n">ccXrot</span><span class="p">,</span> <span class="n">ccYrot</span> <span class="o">=</span> <span class="n">ccXYrot</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:],</span> <span class="n">ccXYrot</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+
+    <span class="c1"># Rotate CCR Truth data</span>
+    <span class="n">ccXYrot_truth</span> <span class="o">=</span> <span class="n">R</span> <span class="o">@</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([(</span><span class="n">ccrX_truth</span> <span class="o">-</span> <span class="n">xRotPt</span><span class="p">),</span> <span class="p">(</span><span class="n">ccrY_truth</span> <span class="o">-</span> <span class="n">yRotPt</span><span class="p">)])</span>
+    <span class="n">ccXrot_truth</span><span class="p">,</span> <span class="n">ccYrot_truth</span> <span class="o">=</span> <span class="n">ccXYrot_truth</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ccXYrot_truth</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+    
+    <span class="c1"># Fit normal distribution to the rotated data</span>
+    <span class="n">histMean</span><span class="p">,</span> <span class="n">histStd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">ccYrot</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">ccYrot</span><span class="p">)</span>
+    <span class="n">yMinActualRot</span><span class="p">,</span> <span class="n">yMaxActualRot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">ccYrot</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">ccYrot</span><span class="p">)</span>
+
+    <span class="c1"># Generate data points for Gaussian fit</span>
+    <span class="n">distPts</span> <span class="o">=</span> <span class="n">histMean</span> <span class="o">+</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">histStd</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1000</span><span class="p">)</span>
+    <span class="n">y2</span> <span class="o">=</span> <span class="n">norm</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">distPts</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">histMean</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">histStd</span><span class="p">)</span>
+
+    <span class="c1"># Calculate predicted bounds</span>
+    <span class="n">gaussDist</span> <span class="o">=</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">histStd</span>
+    <span class="n">yMinPredictedRot</span> <span class="o">=</span> <span class="n">histMean</span> <span class="o">-</span> <span class="n">gaussDist</span>
+    <span class="n">yMaxPredictedRot</span> <span class="o">=</span> <span class="n">histMean</span> <span class="o">+</span> <span class="n">gaussDist</span>
+    <span class="n">yMinPredictedRot3</span> <span class="o">=</span> <span class="n">histMean</span> <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">histStd</span>
+    <span class="n">yMaxPredictedRot3</span> <span class="o">=</span> <span class="n">histMean</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">histStd</span>
+
+    <span class="c1"># Get percent of Gaussian in actual data range</span>
+    <span class="n">cDist</span> <span class="o">=</span> <span class="n">norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">distPts</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">histMean</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">histStd</span><span class="p">)</span>
+    <span class="n">interp_func</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">distPts</span><span class="p">,</span> <span class="n">cDist</span><span class="p">,</span> <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    
+    <span class="n">pctLoBound</span> <span class="o">=</span> <span class="n">interp_func</span><span class="p">(</span><span class="n">yMinActualRot</span><span class="p">)</span>
+    <span class="n">pctHiBound</span> <span class="o">=</span> <span class="n">interp_func</span><span class="p">(</span><span class="n">yMaxActualRot</span><span class="p">)</span>
+    <span class="n">pctTotBound</span> <span class="o">=</span> <span class="p">(</span><span class="n">pctHiBound</span> <span class="o">-</span> <span class="n">pctLoBound</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+
+    <span class="n">pctLoBoundPred</span> <span class="o">=</span> <span class="n">interp_func</span><span class="p">(</span><span class="n">yMinPredictedRot</span><span class="p">)</span>
+    <span class="n">pctHiBoundPred</span> <span class="o">=</span> <span class="n">interp_func</span><span class="p">(</span><span class="n">yMaxPredictedRot</span><span class="p">)</span>
+    <span class="n">pctTotBoundPred</span> <span class="o">=</span> <span class="p">(</span><span class="n">pctHiBoundPred</span> <span class="o">-</span> <span class="n">pctLoBoundPred</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+
+    <span class="c1"># Get sigma of Gaussian in actual data range</span>
+    <span class="n">actualMinSigma</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">yMinActualRot</span> <span class="o">-</span> <span class="n">histMean</span><span class="p">)</span> <span class="o">/</span> <span class="n">histStd</span>
+    <span class="n">actualMaxSigma</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">yMaxActualRot</span> <span class="o">-</span> <span class="n">histMean</span><span class="p">)</span> <span class="o">/</span> <span class="n">histStd</span>
+    <span class="n">actualTotSigma</span> <span class="o">=</span> <span class="n">actualMinSigma</span> <span class="o">+</span> <span class="n">actualMaxSigma</span>
+    
+    <span class="c1"># Interpolate to get more accurate crossing points</span>
+    <span class="n">e2_thresh</span> <span class="o">=</span> <span class="mf">0.135</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">y2</span><span class="p">)</span>
+    <span class="n">e2_range</span> <span class="o">=</span> <span class="n">get_interp_x</span><span class="p">(</span><span class="n">distPts</span><span class="p">,</span> <span class="n">y2</span><span class="p">,</span> <span class="n">e2_thresh</span><span class="p">)</span>
+    <span class="n">e2_minX</span><span class="p">,</span> <span class="n">e2_maxX</span> <span class="o">=</span> <span class="n">e2_range</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">e2_range</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">plot_data</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;ccYrot&quot;</span><span class="p">:</span> <span class="n">ccYrot</span><span class="p">,</span>
+        <span class="s2">&quot;distPts&quot;</span><span class="p">:</span> <span class="n">distPts</span><span class="p">,</span>
+        <span class="s2">&quot;y2&quot;</span><span class="p">:</span> <span class="n">y2</span><span class="p">,</span>
+        <span class="s2">&quot;histMean&quot;</span><span class="p">:</span> <span class="n">histMean</span><span class="p">,</span>
+        <span class="s2">&quot;histStd&quot;</span><span class="p">:</span> <span class="n">histStd</span><span class="p">,</span>
+        <span class="s2">&quot;yMinPredictedRot&quot;</span><span class="p">:</span> <span class="n">yMinPredictedRot</span><span class="p">,</span>
+        <span class="s2">&quot;yMaxPredictedRot&quot;</span><span class="p">:</span> <span class="n">yMaxPredictedRot</span><span class="p">,</span>
+        <span class="s2">&quot;yMinActualRot&quot;</span><span class="p">:</span> <span class="n">yMinActualRot</span><span class="p">,</span>
+        <span class="s2">&quot;yMaxActualRot&quot;</span><span class="p">:</span> <span class="n">yMaxActualRot</span><span class="p">,</span>
+        <span class="s2">&quot;e2_minX&quot;</span><span class="p">:</span> <span class="n">e2_minX</span><span class="p">,</span>
+        <span class="s2">&quot;e2_maxX&quot;</span><span class="p">:</span> <span class="n">e2_maxX</span><span class="p">,</span>
+        <span class="s2">&quot;e2_thresh&quot;</span><span class="p">:</span> <span class="n">e2_thresh</span><span class="p">,</span>
+        <span class="s2">&quot;sigma&quot;</span><span class="p">:</span> <span class="n">sigma</span><span class="p">,</span>
+        <span class="s2">&quot;pctTotBoundPred&quot;</span><span class="p">:</span> <span class="n">pctTotBoundPred</span><span class="p">,</span>
+        <span class="s2">&quot;actualTotSigma&quot;</span><span class="p">:</span> <span class="n">actualTotSigma</span><span class="p">,</span>
+        <span class="s2">&quot;pctTotBound&quot;</span><span class="p">:</span> <span class="n">pctTotBound</span>
+    <span class="p">}</span>
+
+    <span class="n">r_3sig</span> <span class="o">=</span> <span class="n">r_nominal</span>
+    <span class="n">r_actual</span> <span class="o">=</span> <span class="n">r_nominal</span>
+
+    <span class="c1">###MEASURED APPROACH ###</span>
+    <span class="c1"># Get actuals in CT/AT frame</span>
+    <span class="n">cc_Struct</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="n">ccX</span><span class="p">,</span>
+        <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="n">ccY</span><span class="p">,</span>
+        <span class="s1">&#39;xRot&#39;</span><span class="p">:</span> <span class="n">ccXrot</span><span class="p">,</span>
+        <span class="s1">&#39;yRot&#39;</span><span class="p">:</span> <span class="n">ccYrot</span><span class="p">,</span>
+        <span class="s1">&#39;chordNumPts&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot; (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ccXrot</span><span class="p">)</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2"> pts)&quot;</span>
+    <span class="p">}</span>
+    
+    <span class="n">y_rot_max</span><span class="p">,</span> <span class="n">y_rot_min</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">ccYrot</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">ccYrot</span><span class="p">)</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;chord&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">y_rot_max</span> <span class="o">-</span> <span class="n">y_rot_min</span><span class="p">)</span>
+    <span class="n">y_half_chord</span> <span class="o">=</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;chord&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">x_half_chord</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">r_actual</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">y_half_chord</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="c1"># Calculate center and right/left coordinates in rotated frame</span>
+    <span class="n">x_rot_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">ccXrot</span><span class="p">)</span>
+    <span class="n">y_rot_avg</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_rot_max</span> <span class="o">+</span> <span class="n">y_rot_min</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">cc_Struct</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+        <span class="s1">&#39;xChordCenterRot&#39;</span><span class="p">:</span> <span class="n">x_rot_mean</span><span class="p">,</span>
+        <span class="s1">&#39;yChordCenterRot&#39;</span><span class="p">:</span> <span class="n">y_rot_avg</span><span class="p">,</span>
+        <span class="s1">&#39;xCenterRightRot&#39;</span><span class="p">:</span> <span class="n">x_rot_mean</span> <span class="o">+</span> <span class="n">x_half_chord</span><span class="p">,</span>
+        <span class="s1">&#39;yCenterRightRot&#39;</span><span class="p">:</span> <span class="n">y_rot_max</span> <span class="o">-</span> <span class="n">y_half_chord</span><span class="p">,</span>
+        <span class="s1">&#39;xCenterLeftRot&#39;</span><span class="p">:</span> <span class="n">x_rot_mean</span> <span class="o">-</span> <span class="n">x_half_chord</span><span class="p">,</span>
+        <span class="s1">&#39;yCenterLeftRot&#39;</span><span class="p">:</span> <span class="n">y_rot_max</span> <span class="o">-</span> <span class="n">y_half_chord</span>
+    <span class="p">})</span>
+
+    <span class="c1"># Generate circles</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleRightRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleRightRot&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">makeCircle</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterRightRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterRightRot&#39;</span><span class="p">],</span> <span class="n">r_actual</span><span class="p">)</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleLeftRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleLeftRot&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">makeCircle</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterLeftRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterLeftRot&#39;</span><span class="p">],</span> <span class="n">r_actual</span><span class="p">)</span>
+
+    <span class="c1"># Apply rotation matrix and offsets for X/Y frame</span>
+    <span class="k">def</span> <span class="nf">apply_rotation_offset</span><span class="p">(</span><span class="n">x_rot</span><span class="p">,</span> <span class="n">y_rot</span><span class="p">):</span>
+        <span class="n">x_y_rot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="p">[</span><span class="n">x_rot</span><span class="p">,</span> <span class="n">y_rot</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">x_y_rot</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">xRotPt</span><span class="p">,</span> <span class="n">x_y_rot</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">yRotPt</span>
+
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xChordCenter&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yChordCenter&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">apply_rotation_offset</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xChordCenterRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yChordCenterRot&#39;</span><span class="p">])</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterRight&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterRight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">apply_rotation_offset</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterRightRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterRightRot&#39;</span><span class="p">])</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleRight&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleRight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">apply_rotation_offset</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleRightRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleRightRot&#39;</span><span class="p">])</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterLeft&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterLeft&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">apply_rotation_offset</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterLeftRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterLeftRot&#39;</span><span class="p">])</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleLeft&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleLeft&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">apply_rotation_offset</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleLeftRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleLeftRot&#39;</span><span class="p">])</span>
+
+    <span class="c1">## STATISTICAL APPROACH ##</span>
+    <span class="n">yRotPred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">yMinPredictedRot</span><span class="p">,</span> <span class="n">yMaxPredictedRot</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+    <span class="n">cc_Struct</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+        <span class="s1">&#39;xRotPred&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">yRotPred</span><span class="p">,</span> <span class="n">x_rot_mean</span><span class="p">),</span>
+        <span class="s1">&#39;yRotPred&#39;</span><span class="p">:</span> <span class="n">yRotPred</span><span class="p">,</span>
+        <span class="s1">&#39;chordPred&#39;</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ptp</span><span class="p">(</span><span class="n">yRotPred</span><span class="p">)),</span>
+    <span class="p">})</span>
+
+    <span class="n">y_half_chord_pred</span> <span class="o">=</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;chordPred&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">x_half_chord_pred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">r_3sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">y_half_chord_pred</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="c1"># Centers for predicted values</span>
+    <span class="n">cc_Struct</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+        <span class="s1">&#39;xChordCenterRotPred&#39;</span><span class="p">:</span> <span class="n">x_rot_mean</span><span class="p">,</span>
+        <span class="s1">&#39;yChordCenterRotPred&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">yRotPred</span><span class="p">),</span>
+        <span class="s1">&#39;xCenterRightRotPred&#39;</span><span class="p">:</span> <span class="n">x_rot_mean</span> <span class="o">+</span> <span class="n">x_half_chord_pred</span><span class="p">,</span>
+        <span class="s1">&#39;yCenterRightRotPred&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">yRotPred</span><span class="p">)</span> <span class="o">-</span> <span class="n">y_half_chord_pred</span><span class="p">,</span>
+        <span class="s1">&#39;xCenterLeftRotPred&#39;</span><span class="p">:</span> <span class="n">x_rot_mean</span> <span class="o">-</span> <span class="n">x_half_chord_pred</span><span class="p">,</span>
+        <span class="s1">&#39;yCenterLeftRotPred&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">yRotPred</span><span class="p">)</span> <span class="o">-</span> <span class="n">y_half_chord_pred</span><span class="p">,</span>
+    <span class="p">})</span>
+
+    <span class="c1"># Generate Circles</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleRightRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleRightRotPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">makeCircle</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterRightRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterRightRotPred&#39;</span><span class="p">],</span> <span class="n">r_3sig</span><span class="p">)</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleLeftRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleLeftRotPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">makeCircle</span><span class="p">(</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterLeftRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterLeftRotPred&#39;</span><span class="p">],</span> <span class="n">r_3sig</span><span class="p">)</span>
+
+    <span class="c1"># Get predicted values in CT/AT frame (3 sigma)</span>
+    <span class="n">yRotPred3</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">yMinPredictedRot3</span><span class="p">,</span> <span class="n">yMaxPredictedRot3</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+    <span class="n">cc_Struct</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+        <span class="s1">&#39;xRotPred3&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">yRotPred3</span><span class="p">,</span> <span class="n">x_rot_mean</span><span class="p">),</span>
+        <span class="s1">&#39;yRotPred3&#39;</span><span class="p">:</span> <span class="n">yRotPred3</span><span class="p">,</span>
+        <span class="s1">&#39;chordPred3&#39;</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ptp</span><span class="p">(</span><span class="n">yRotPred3</span><span class="p">)),</span>
+    <span class="p">})</span>
+
+    <span class="c1"># Get predicted values in X/Y frame</span>
+    <span class="n">xyPred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yRotPred&#39;</span><span class="p">]]))</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyPred</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">xRotPt</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyPred</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">yRotPt</span>
+
+    <span class="n">xyChordCenterPred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xChordCenterRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yChordCenterRotPred&#39;</span><span class="p">]]))</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xChordCenterPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyChordCenterPred</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">xRotPt</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yChordCenterPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyChordCenterPred</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">yRotPt</span>
+
+    <span class="n">xyCenterRightPred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterRightRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterRightRotPred&#39;</span><span class="p">]]))</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterRightPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyCenterRightPred</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">xRotPt</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterRightPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyCenterRightPred</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">yRotPt</span>
+
+    <span class="n">xyCenterLeftPred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterLeftRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterLeftRotPred&#39;</span><span class="p">]]))</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterLeftPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyCenterLeftPred</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">xRotPt</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterLeftPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyCenterLeftPred</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">yRotPt</span>
+
+    <span class="n">xyCircleRightPred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleRightRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleRightRotPred&#39;</span><span class="p">]]))</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleRightPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyCircleRightPred</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">xRotPt</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleRightPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyCircleRightPred</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">yRotPt</span>
+
+    <span class="n">xyCircleLeftPred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleLeftRotPred&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleLeftRotPred&#39;</span><span class="p">]]))</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCircleLeftPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyCircleLeftPred</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">xRotPt</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCircleLeftPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xyCircleLeftPred</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">yRotPt</span>
+
+    <span class="c1"># Make circles around CCR data</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;ccrCircleXRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;ccrCircleYRot&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">makeCircle</span><span class="p">(</span><span class="n">ccXrot_truth</span><span class="p">,</span> <span class="n">ccYrot_truth</span><span class="p">,</span> <span class="n">r_3sig</span><span class="p">)</span>
+    <span class="n">ccrCircleXY_input</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;ccrCircleXRot&#39;</span><span class="p">],</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;ccrCircleYRot&#39;</span><span class="p">]))</span>
+    <span class="n">ccrCircleXY</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">ccrCircleXY_input</span><span class="p">)</span>
+
+    <span class="n">cc_Struct</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+        <span class="s1">&#39;ccrCircleX&#39;</span><span class="p">:</span> <span class="n">ccrCircleXY</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">xRotPt</span><span class="p">,</span>
+        <span class="s1">&#39;ccrCircleY&#39;</span><span class="p">:</span> <span class="n">ccrCircleXY</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">yRotPt</span><span class="p">,</span>
+    <span class="p">})</span>
+
+    <span class="c1">## OUTPUT ##</span>
+    <span class="c1"># Define centroids and their predictions</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCentroidDeltaLeft&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccXrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterLeftRot&#39;</span><span class="p">]</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCentroidDeltaLeft&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccYrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterLeftRot&#39;</span><span class="p">]</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCentroidDeltaLeftPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccXrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterLeftRotPred&#39;</span><span class="p">]</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCentroidDeltaLeftPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccYrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterLeftRotPred&#39;</span><span class="p">]</span>
+
+    <span class="c1"># Calculate RMSE</span>
+    <span class="n">measX_rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">ccXrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xRot&#39;</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+    <span class="n">measY_rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">ccYrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yRot&#39;</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+    <span class="n">statX_rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">ccXrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xRotPred&#39;</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+    <span class="n">statY_rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">ccYrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yRotPred&#39;</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="c1"># Define right centroids and their predictions</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCentroidDeltaRight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccXrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterRightRot&#39;</span><span class="p">]</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCentroidDeltaRight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccYrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterRightRot&#39;</span><span class="p">]</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCentroidDeltaRightPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccXrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCenterRightRotPred&#39;</span><span class="p">]</span>
+    <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCentroidDeltaRightPred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ccYrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCenterRightRotPred&#39;</span><span class="p">]</span>
+
+    <span class="c1">#Final Structure Updates</span>
+    <span class="n">cc_Struct</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+        <span class="s1">&#39;measX_delta&#39;</span><span class="p">:</span> <span class="n">ccXrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xChordCenterRot&#39;</span><span class="p">],</span>
+        <span class="s1">&#39;measY_delta&#39;</span><span class="p">:</span> <span class="n">ccYrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yChordCenterRot&#39;</span><span class="p">],</span>
+        <span class="s1">&#39;statX_delta&#39;</span><span class="p">:</span> <span class="n">ccXrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xChordCenterRotPred&#39;</span><span class="p">],</span>
+        <span class="s1">&#39;statY_delta&#39;</span><span class="p">:</span> <span class="n">ccYrot_truth</span> <span class="o">-</span> <span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yChordCenterRotPred&#39;</span><span class="p">],</span>
+        <span class="s1">&#39;measX_rmse&#39;</span><span class="p">:</span> <span class="n">measX_rmse</span><span class="p">,</span>
+        <span class="s1">&#39;measY_rmse&#39;</span><span class="p">:</span> <span class="n">measY_rmse</span><span class="p">,</span>
+        <span class="s1">&#39;statX_rmse&#39;</span><span class="p">:</span> <span class="n">statX_rmse</span><span class="p">,</span>
+        <span class="s1">&#39;statY_rmse&#39;</span><span class="p">:</span> <span class="n">statY_rmse</span><span class="p">,</span>
+        <span class="s1">&#39;r_3sig&#39;</span><span class="p">:</span> <span class="n">r_3sig</span><span class="p">,</span>
+        <span class="s1">&#39;r_actual&#39;</span><span class="p">:</span> <span class="n">r_actual</span>
+    <span class="p">})</span>
+
+    <span class="c1"># Print results</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;CCR #</span><span class="si">{</span><span class="n">ccNum</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="s2">&quot;Parameter&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="s2">&quot;Measured&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> Sigma&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sigma</span><span class="p">)</span><span class="si">:</span><span class="s1">&lt;15</span><span class="si">}{</span><span class="s2">&quot;CCR&quot;</span><span class="si">:</span><span class="s1">&lt;15</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="s2">&quot;---------&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="s2">&quot;----------&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="s2">&quot;-----------&quot;</span><span class="si">:</span><span class="s1">&lt;15</span><span class="si">}{</span><span class="s2">&quot;----------&quot;</span><span class="si">:</span><span class="s1">&lt;15</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="s2">&quot;Chord Length (m)&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s2">&quot;chord&quot;</span><span class="p">]</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s2">&quot;chordNumPts&quot;</span><span class="p">]</span><span class="si">}{</span><span class="s2">&quot;&quot;</span><span class="si">:</span><span class="s1">&lt;7</span><span class="si">}{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s2">&quot;chordPred&quot;</span><span class="p">]</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="s2">&quot;X Centroid (m)&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s2">&quot;xCenterLeftRot&quot;</span><span class="p">]</span><span class="si">:</span><span class="s1">&lt;20.2f</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s2">&quot;xCenterLeftRotPred&quot;</span><span class="p">]</span><span class="si">:</span><span class="s1">&lt;15.2f</span><span class="si">}{</span><span class="n">ccXrot_truth</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s1">&lt;15.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="s2">&quot;Y Centroid (m)&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s2">&quot;yCenterLeftRot&quot;</span><span class="p">]</span><span class="si">:</span><span class="s1">&lt;20.2f</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s2">&quot;yCenterLeftRotPred&quot;</span><span class="p">]</span><span class="si">:</span><span class="s1">&lt;15.2f</span><span class="si">}{</span><span class="n">ccYrot_truth</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s1">&lt;15.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="s2">&quot;Delta X (m)&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCentroidDeltaLeft&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s1">&lt;20.2f</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;xCentroidDeltaLeftPred&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s1">&lt;15.2f</span><span class="si">}{</span><span class="s2">&quot;&quot;</span><span class="si">:</span><span class="s1">&lt;15</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="s2">&quot;Delta Y (m)&quot;</span><span class="si">:</span><span class="s1">&lt;20</span><span class="si">}{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCentroidDeltaLeft&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s1">&lt;20.2f</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">cc_Struct</span><span class="p">[</span><span class="s1">&#39;yCentroidDeltaLeftPred&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s1">&lt;15.2f</span><span class="si">}{</span><span class="s2">&quot;&quot;</span><span class="si">:</span><span class="s1">&lt;15</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">cc_Struct</span><span class="p">,</span> <span class="n">plot_data</span></div>
+
+
+<div class="viewcode-block" id="get_combos">
+<a class="viewcode-back" href="../../src.html#src.get_footprint.get_combos">[docs]</a>
+<span class="k">def</span> <span class="nf">get_combos</span><span class="p">(</span><span class="n">cc_Struct_dict</span><span class="p">,</span> <span class="n">centroidSides</span><span class="p">,</span> <span class="n">ccrX_truthRot_dict</span><span class="p">,</span> <span class="n">ccrY_truthRot_dict</span><span class="p">):</span>
+    <span class="c1"># Initialize the combo arrays</span>
+    <span class="n">combo_array</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">combo_arrayPred</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Get the number of keys (or current_index) in cc_Struct_dict</span>
+    <span class="n">num_indices</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cc_Struct_dict</span><span class="p">)</span>
+
+    <span class="c1"># Generate all combinations of centroidSides based on the number of indices</span>
+    <span class="n">centroid_combinations</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="n">centroidSides</span><span class="p">,</span> <span class="n">repeat</span><span class="o">=</span><span class="n">num_indices</span><span class="p">))</span>
+
+    <span class="c1"># Loop over each combination</span>
+    <span class="k">for</span> <span class="n">combo</span> <span class="ow">in</span> <span class="n">centroid_combinations</span><span class="p">:</span>
+        <span class="n">combo_row</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="mi">46</span>
+        <span class="n">combo_row_pred</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="mi">46</span>
+
+        <span class="c1"># Access the correct structure for each index</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">cc_Struct_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">x_offsets</span><span class="p">,</span> <span class="n">y_offsets</span><span class="p">,</span> <span class="n">x_offsets_pred</span><span class="p">,</span> <span class="n">y_offsets_pred</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">side</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">combo</span><span class="p">):</span>
+            <span class="n">current_index</span> <span class="o">=</span> <span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">cc_Struct</span> <span class="o">=</span> <span class="n">cc_Struct_dict</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span>
+
+            <span class="c1"># Construct the combination entry</span>
+            <span class="n">combo_row</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">current_index</span><span class="si">}</span><span class="s2">*</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">combo_row_pred</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">current_index</span><span class="si">}</span><span class="s2">*</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s2">&quot;</span>
+
+            <span class="c1"># Retrieve X and Y centroid deltas and predictions</span>
+            <span class="n">x_offsets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cc_Struct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;xCentroidDelta</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+            <span class="n">y_offsets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cc_Struct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;yCentroidDelta</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+            <span class="n">x_offsets_pred</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cc_Struct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;xCentroidDelta</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s1">Pred&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+            <span class="n">y_offsets_pred</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cc_Struct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;yCentroidDelta</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s1">Pred&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+
+        <span class="c1"># Calculate mean offsets</span>
+        <span class="n">combo_row</span><span class="p">[</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">x_offsets</span><span class="p">)</span>
+        <span class="n">combo_row</span><span class="p">[</span><span class="mi">19</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">y_offsets</span><span class="p">)</span>
+        <span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">x_offsets_pred</span><span class="p">)</span>
+        <span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">19</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">y_offsets_pred</span><span class="p">)</span>
+
+        <span class="c1"># Apply mean offsets in both X and Y</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">side</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">combo</span><span class="p">):</span>
+            <span class="n">current_index</span> <span class="o">=</span> <span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">cc_Struct</span> <span class="o">=</span> <span class="n">cc_Struct_dict</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span>
+            <span class="n">combo_row</span><span class="p">[</span><span class="mi">20</span> <span class="o">+</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cc_Struct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;xCenter</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s1">Rot&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">+</span> <span class="n">combo_row</span><span class="p">[</span><span class="mi">18</span><span class="p">]</span>
+            <span class="n">combo_row</span><span class="p">[</span><span class="mi">26</span> <span class="o">+</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cc_Struct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;yCenter</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s1">Rot&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">+</span> <span class="n">combo_row</span><span class="p">[</span><span class="mi">19</span><span class="p">]</span>
+
+            <span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">20</span> <span class="o">+</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cc_Struct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;xCenter</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s1">RotPred&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">+</span> <span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">18</span><span class="p">]</span>
+            <span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">26</span> <span class="o">+</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cc_Struct</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;yCenter</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s1">RotPred&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">+</span> <span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">19</span><span class="p">]</span>
+
+        <span class="c1"># Compute all residuals</span>
+        <span class="n">x_residuals</span> <span class="o">=</span> <span class="p">[</span><span class="n">combo_row</span><span class="p">[</span><span class="mi">20</span> <span class="o">+</span> <span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ccrX_truthRot_dict</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_indices</span><span class="p">)]</span>
+        <span class="n">y_residuals</span> <span class="o">=</span> <span class="p">[</span><span class="n">combo_row</span><span class="p">[</span><span class="mi">26</span> <span class="o">+</span> <span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ccrY_truthRot_dict</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_indices</span><span class="p">)]</span>
+
+        <span class="n">x_residuals_pred</span> <span class="o">=</span> <span class="p">[</span><span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">20</span> <span class="o">+</span> <span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ccrX_truthRot_dict</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_indices</span><span class="p">)]</span>
+        <span class="n">y_residuals_pred</span> <span class="o">=</span> <span class="p">[</span><span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">26</span> <span class="o">+</span> <span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ccrY_truthRot_dict</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_indices</span><span class="p">)]</span>
+
+        <span class="c1"># Calculate RMSE for all residuals</span>
+        <span class="n">combo_row</span><span class="p">[</span><span class="mi">44</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">x_residuals</span><span class="p">)))</span>  <span class="c1"># RMSE X</span>
+        <span class="n">combo_row</span><span class="p">[</span><span class="mi">45</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">y_residuals</span><span class="p">)))</span>  <span class="c1"># RMSE Y</span>
+        <span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">44</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">x_residuals_pred</span><span class="p">)))</span>  <span class="c1"># RMSE X</span>
+        <span class="n">combo_row_pred</span><span class="p">[</span><span class="mi">45</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">y_residuals_pred</span><span class="p">)))</span>  <span class="c1"># RMSE Y</span>
+
+        <span class="c1"># Append to the output arrays</span>
+        <span class="n">combo_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">combo_row</span><span class="p">)</span>
+        <span class="n">combo_arrayPred</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">combo_row_pred</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">combo_array</span><span class="p">,</span> <span class="n">combo_arrayPred</span>    </div>
+
+
+<div class="viewcode-block" id="get_footprint">
+<a class="viewcode-back" href="../../src.html#src.get_footprint.get_footprint">[docs]</a>
+<span class="k">def</span> <span class="nf">get_footprint</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">footprint_range</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">):</span>
+    <span class="n">footprint_diameters_str</span> <span class="o">=</span> <span class="n">footprint_range</span>
+    <span class="n">start</span><span class="p">,</span> <span class="n">step</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">footprint_diameters_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">))</span>
+    <span class="n">footprint_diameters</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">+</span> <span class="n">step</span><span class="p">,</span> <span class="n">step</span><span class="p">))</span>  <span class="c1"># Using NumPy for range generation</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Loop over footprint diameters</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">diameter</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">footprint_diameters</span><span class="p">):</span>
+        
+        <span class="n">r_nominal</span> <span class="o">=</span> <span class="n">diameter</span> <span class="o">/</span> <span class="mi">2</span>
+        
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Diameter Used = </span><span class="si">{</span><span class="n">r_nominal</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> m&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;----------------------&#39;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># Assuming plot_ccr_footprints_ant is a defined function that returns multiple outputs</span>
+        <span class="n">results_temp</span><span class="p">,</span> <span class="n">combo_arrayPred</span><span class="p">,</span> <span class="n">cc_Struct_dict</span><span class="p">,</span> <span class="n">direction</span><span class="p">,</span> <span class="n">plot_data_list</span> <span class="o">=</span> <span class="n">get_offset</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">r_nominal</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">)</span>
+        <span class="c1"># Append the temporary results for this diameter to the results list</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">results_temp</span><span class="p">)</span>    
+    
+    <span class="c1"># Get output results</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+    <span class="c1"># Find the index of the minimum value in column index 5</span>
+    <span class="n">min_row_index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">results</span><span class="p">[:,</span> <span class="mi">5</span><span class="p">])</span>  <span class="c1"># Using index 5 for column 6 (0-based indexing)</span>
+    <span class="c1"># Retrieve the nominal diameter</span>
+    <span class="n">nominal_diameter</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>  <span class="c1"># Column 1 (0-based index)</span>
+
+    <span class="c1"># Print results</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">RESULTS&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-------&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Nominal Footprint Diameter = </span><span class="si">{</span><span class="n">nominal_diameter</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> m</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Statistical Easting Offset = </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> m&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Statistical Northing Offset = </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> m</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Statistical Cross-Track Offset = </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> m (</span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> m RMSE)&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Statistical Along-Track Offset = </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> m (</span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> m RMSE)</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1">#Initializing Values</span>
+    <span class="n">e_shift_pred</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>  <span class="c1"># Column 1 for Easting shift</span>
+    <span class="n">n_shift_pred</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="n">min_row_index</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>  <span class="c1"># Column 2 for Northing shift</span>
+    
+    <span class="n">ccNumRegions</span> <span class="o">=</span> <span class="n">find_ccr_regions</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">)</span>
+    <span class="n">first_valid_region</span> <span class="o">=</span> <span class="n">ccNumRegions</span><span class="p">[</span><span class="s1">&#39;region_axes&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Get the first valid region</span>
+    <span class="n">x_limits</span> <span class="o">=</span> <span class="n">first_valid_region</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>
+    <span class="n">y_limits</span> <span class="o">=</span> <span class="n">first_valid_region</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span>
+
+    <span class="c1"># Plotting</span>
+    <span class="n">fig8</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;equal&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;xlabelStr&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ylabelStr&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="c1"># Create empty lists for handles and labels</span>
+    <span class="n">handles</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Plot all CCR Arrays</span>
+    <span class="n">sc</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrX&#39;</span><span class="p">],</span> <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">40</span><span class="p">)</span>
+    <span class="c1">#Plot all CCR arrays text</span>
+    <span class="k">for</span> <span class="n">current_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrNames&#39;</span><span class="p">])):</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">text</span><span class="p">((</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrX&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">current_index</span><span class="p">]),</span> <span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span><span class="o">-</span><span class="mi">3</span><span class="p">),</span> 
+                <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrNames&#39;</span><span class="p">][</span><span class="n">current_index</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">)</span>
+    <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sc</span><span class="p">)</span>
+    <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Other CCRs&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Plot GT2R and RGT data in Easting/Northing Plane</span>
+    <span class="n">gt_data_plot</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_x&#39;</span><span class="p">],</span> <span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_y&#39;</span><span class="p">],</span> <span class="s1">&#39;k.&#39;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gt_data_plot</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Ground Track Orginal&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Plot GT2R and RGT data with East/North Shift Predicted</span>
+    <span class="n">pred_gt_data_plot</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_x&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">e_shift_pred</span><span class="p">),</span> <span class="p">(</span><span class="n">gt_data</span><span class="p">[</span><span class="s1">&#39;gt_y&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">n_shift_pred</span><span class="p">),</span> <span class="s1">&#39;g.&#39;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pred_gt_data_plot</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Ground Track Predicted&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Plot CCR Footprint (actual)</span>
+    <span class="k">for</span> <span class="n">current_index</span><span class="p">,</span> <span class="n">cc_struct</span> <span class="ow">in</span> <span class="n">cc_Struct_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">footprint_plot</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">((</span><span class="n">cc_struct</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">e_shift_pred</span><span class="p">),</span> <span class="p">(</span><span class="n">cc_struct</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">n_shift_pred</span><span class="p">),</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;^&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="mi">128</span><span class="o">/</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="o">/</span><span class="mi">255</span><span class="p">,</span> <span class="mi">128</span><span class="o">/</span><span class="mi">255</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">current_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Only add the label once</span>
+            <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">footprint_plot</span><span class="p">)</span>
+            <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Actual CCR Returns&#39;</span><span class="p">)</span>
+    
+    <span class="c1"># Plot Footprints over Measured Data</span>
+    <span class="k">for</span> <span class="n">current_index</span><span class="p">,</span> <span class="n">cc_struct</span> <span class="ow">in</span> <span class="n">cc_Struct_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cc_struct</span><span class="p">[</span><span class="s1">&#39;xRotPred&#39;</span><span class="p">])):</span>
+            <span class="c1"># Calculate the coordinates for the circle</span>
+            <span class="n">atl03CircleXrot</span><span class="p">,</span> <span class="n">atl03CircleYrot</span> <span class="o">=</span> <span class="n">makeCircle</span><span class="p">((</span><span class="n">cc_struct</span><span class="p">[</span><span class="s1">&#39;xPred&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="n">e_shift_pred</span><span class="p">),</span>
+                <span class="p">(</span><span class="n">cc_struct</span><span class="p">[</span><span class="s1">&#39;yPred&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="n">n_shift_pred</span><span class="p">),</span> <span class="n">cc_struct</span><span class="p">[</span><span class="s1">&#39;r_3sig&#39;</span><span class="p">])</span>
+            <span class="c1"># Plot the circle</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">atl03CircleXrot</span><span class="p">,</span> <span class="n">atl03CircleYrot</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Plot CCR footprint (predicted)</span>
+    <span class="k">for</span> <span class="n">current_index</span><span class="p">,</span> <span class="n">cc_struct</span> <span class="ow">in</span> <span class="n">cc_Struct_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">((</span><span class="n">cc_struct</span><span class="p">[</span><span class="s1">&#39;xPred&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">e_shift_pred</span><span class="p">),</span> <span class="p">(</span><span class="n">cc_struct</span><span class="p">[</span><span class="s1">&#39;yPred&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">n_shift_pred</span><span class="p">),</span>
+        <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>  <span class="c1"># Adjust markersize as needed</span>
+        <span class="n">facecolor</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Access the relevant x and y circle coordinates based on direction</span>
+        <span class="n">x_circle</span> <span class="o">=</span> <span class="p">(</span><span class="n">cc_struct</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;xCircle</span><span class="si">{</span><span class="n">direction</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span><span class="si">}</span><span class="s1">Pred&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">e_shift_pred</span><span class="p">)</span>
+        <span class="n">y_circle</span> <span class="o">=</span> <span class="p">(</span><span class="n">cc_struct</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;yCircle</span><span class="si">{</span><span class="n">direction</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span><span class="si">}</span><span class="s1">Pred&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">n_shift_pred</span><span class="p">)</span>
+        
+        <span class="c1"># Plot the circles as solid lines</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_circle</span><span class="p">,</span> <span class="n">y_circle</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">dummy_handle</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">([],</span> <span class="p">[],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">facecolor</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># Invisible point</span>
+    <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dummy_handle</span><span class="p">)</span>
+    <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;2σ CCR Returns&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Plot CCR Hits</span>
+    <span class="k">for</span> <span class="n">current_index</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">ccr_data_index</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">closest_ccr_x</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;closest_ccr_x&#39;</span><span class="p">]</span>  <span class="c1"># Extract x for the current row</span>
+        <span class="n">closest_ccr_y</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;closest_ccr_y&#39;</span><span class="p">]</span>  <span class="c1"># Extract y for the current row</span>
+        <span class="n">hits</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">closest_ccr_x</span><span class="p">,</span> <span class="n">closest_ccr_y</span><span class="p">,</span> <span class="s1">&#39;rx&#39;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">markeredgewidth</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">markerfacecolor</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">current_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;CCR Hit&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Plot Predicted CCR Location</span>
+    <span class="k">for</span> <span class="n">current_index</span><span class="p">,</span> <span class="n">cc_struct</span> <span class="ow">in</span> <span class="n">cc_Struct_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">x_center</span> <span class="o">=</span> <span class="p">(</span><span class="n">cc_struct</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;xCenter</span><span class="si">{</span><span class="n">direction</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span><span class="si">}</span><span class="s1">Pred&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">e_shift_pred</span><span class="p">)</span>
+        <span class="n">y_center</span> <span class="o">=</span> <span class="p">(</span><span class="n">cc_struct</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;yCenter</span><span class="si">{</span><span class="n">direction</span><span class="p">[</span><span class="n">current_index</span><span class="p">]</span><span class="si">}</span><span class="s1">Pred&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">n_shift_pred</span><span class="p">)</span>
+        
+        <span class="c1"># Plot the centers with specified styles</span>
+        <span class="n">pred_footprint_plot</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">x_center</span><span class="p">,</span> <span class="n">y_center</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;s&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> 
+                                       <span class="n">facecolor</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">current_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Only add the label once</span>
+            <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pred_footprint_plot</span><span class="p">)</span>
+            <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Predicted CCR Locations&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Plot CCR Hit Text</span>
+    <span class="k">for</span> <span class="n">current_index</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">ccr_data_index</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">closest_ccr_index</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;closest_ccr_index&#39;</span><span class="p">]</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">text</span><span class="p">((</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrX&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">closest_ccr_index</span><span class="p">]),</span> <span class="p">(</span><span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">closest_ccr_index</span><span class="p">]</span><span class="o">-</span><span class="mi">3</span><span class="p">),</span> 
+                <span class="n">ccr_truth_data</span><span class="p">[</span><span class="s1">&#39;ccrNames&#39;</span><span class="p">][</span><span class="n">closest_ccr_index</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s1">&#39;bold&#39;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">)</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">handles</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper left&#39;</span><span class="p">,</span> <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="mf">0.73</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">(</span><span class="n">x_limits</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="n">y_limits</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;footprint_final.png&#39;</span><span class="p">))</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig8</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span><span class="p">,</span> <span class="n">plot_data_list</span></div>
+
+
+<span class="c1">#Main function to execute everything</span>
+<div class="viewcode-block" id="full_output">
+<a class="viewcode-back" href="../../src.html#src.get_footprint.full_output">[docs]</a>
+<span class="k">def</span> <span class="nf">full_output</span><span class="p">(</span><span class="n">h5_file_path</span><span class="p">,</span> <span class="n">gt_num</span><span class="p">,</span> <span class="n">region_name</span><span class="p">,</span> <span class="n">footprint_range</span><span class="p">,</span> <span class="n">imported_h5</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">run_select_data</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="c1"># Extract the date from the H5 file name</span>
+    <span class="n">base_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">h5_file_path</span><span class="p">)</span>  <span class="c1"># Get the file name from the full path</span>
+    <span class="n">date_str</span> <span class="o">=</span> <span class="n">base_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">2</span><span class="p">][:</span><span class="mi">8</span><span class="p">]</span>  <span class="c1"># Extracting date portion for naming</span>
+
+    <span class="c1"># Create a unique identifier for the output directory using the current timestamp</span>
+    <span class="n">timestamp</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">_%H%M%S&quot;</span><span class="p">)</span>  <span class="c1"># Format: YYYYMMDD_HHMMSS</span>
+    <span class="n">output_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;output&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;results_</span><span class="si">{</span><span class="n">date_str</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># Unique output directory</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># Create the directory if it doesn&#39;t exist</span>
+
+    <span class="c1"># Get lidar output data</span>
+    <span class="n">lidar_mat_file</span> <span class="o">=</span> <span class="s1">&#39;path_to_your_file/ATL03_data.mat&#39;</span>
+
+    <span class="k">if</span> <span class="n">run_select_data</span><span class="p">:</span>
+        <span class="c1"># Full data processing</span>
+        <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">utm_correction</span> <span class="o">=</span> <span class="n">read_and_transform_data</span><span class="p">(</span><span class="n">h5_file_path</span><span class="p">,</span> <span class="n">gt_num</span><span class="p">,</span> <span class="n">lidar_mat_file</span><span class="p">)</span>
+        <span class="n">ccr_truth_data</span> <span class="o">=</span> <span class="n">load_ccr_truth_data</span><span class="p">(</span><span class="n">region_name</span><span class="p">)</span>
+
+        <span class="c1"># Plot the data using the plot_data function</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span> <span class="o">=</span> <span class="n">plot_selection_data</span><span class="p">(</span><span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">region_name</span><span class="p">)</span>
+
+        <span class="c1"># Handle user selections</span>
+        <span class="n">ccr_data_index</span> <span class="o">=</span> <span class="n">handle_selections</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">ax1</span><span class="p">,</span> <span class="n">scatter_plot</span><span class="p">,</span> <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">)</span>
+
+        <span class="c1"># Pass output_dir to get_footprint</span>
+        <span class="n">results</span><span class="p">,</span> <span class="n">plot_data_list</span> <span class="o">=</span> <span class="n">get_footprint</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">footprint_range</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">)</span>
+
+        <span class="n">plot_figures</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">,</span> <span class="n">results</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">plot_data_list</span><span class="p">)</span>
+
+        <span class="n">hdf5_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;ccrData_</span><span class="si">{</span><span class="n">date_str</span><span class="si">}</span><span class="s1">.h5&#39;</span><span class="p">)</span>
+        <span class="n">export_to_hdf5</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">hdf5_filename</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Only import indices</span>
+        <span class="n">ccr_data_index</span> <span class="o">=</span> <span class="n">import_from_hdf5</span><span class="p">(</span><span class="n">imported_h5</span><span class="p">)</span>  <span class="c1"># Example file path</span>
+        
+        <span class="c1"># Re-run necessary data processing steps</span>
+        <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">utm_correction</span> <span class="o">=</span> <span class="n">read_and_transform_data</span><span class="p">(</span><span class="n">h5_file_path</span><span class="p">,</span> <span class="n">gt_num</span><span class="p">,</span> <span class="n">lidar_mat_file</span><span class="p">)</span>
+        <span class="n">ccr_truth_data</span> <span class="o">=</span> <span class="n">load_ccr_truth_data</span><span class="p">(</span><span class="n">region_name</span><span class="p">)</span>
+
+        <span class="c1"># Pass output_dir to get_footprint</span>
+        <span class="n">results</span><span class="p">,</span> <span class="n">plot_data_list</span> <span class="o">=</span> <span class="n">get_footprint</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">gt_data</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">footprint_range</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">)</span>
+
+        <span class="n">plot_figures</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">ccr_truth_data</span><span class="p">,</span> <span class="n">gt_data_corrected</span><span class="p">,</span> <span class="n">utm_correction</span><span class="p">,</span> <span class="n">results</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">plot_data_list</span><span class="p">)</span>
+
+        <span class="n">hdf5_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;ccrData_</span><span class="si">{</span><span class="n">date_str</span><span class="si">}</span><span class="s1">.h5&#39;</span><span class="p">)</span>
+        <span class="n">export_to_hdf5</span><span class="p">(</span><span class="n">ccr_data_index</span><span class="p">,</span> <span class="n">hdf5_filename</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">ccr_data_index</span>  <span class="c1"># Return the index for further use if needed</span>
+
+    <span class="k">pass</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">ccrAnalysis</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">src</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Anakin Martinez.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
