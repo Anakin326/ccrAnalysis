@@ -6,6 +6,12 @@ Retroreflector (CCR) method. This repository provides both a command-line interf
 
 The repository includes all necessary scripts for data processing, visualization, and exporting results, except for the Lidar return data files.
 
+## API Documentation
+For detailed API Documentation, please refer to:
+```
+ccrAnalysis/docs/build/html/index.html
+```
+
 ## Repository Structure
 The structure of the repository is as follows:
 
