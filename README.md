@@ -43,7 +43,7 @@ git clone https://github.com/Anakin326/ccrAnalysis.git
 cd ccrAnalysis
 ```
 ### Install Dependencies
-Ensure you have Python 3.12 or higher installed on your system. It's recommended to set up a virtual environment for the project (optional but preferred). Then, install the required dependencies:
+Ensure you have ***Python 3.12*** or higher installed on your system. It's recommended to set up a virtual environment for the project (optional but preferred). Then, install the required dependencies:
 ```
 pip install -r requirements.txt
 ```
