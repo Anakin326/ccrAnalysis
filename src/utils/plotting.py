@@ -73,7 +73,7 @@ def makeCircle(x, y, r):
     yPts = r * np.sin(theta) + y
     return xPts, yPts
 
-def find_ccr_regions(ccr_data_index):
+def find_ccr_regions(region_name, ccr_data_index):
     """
     Assign each entry in the CCR data to a specific region based on the ccNum.
 
@@ -95,19 +95,25 @@ def find_ccr_regions(ccr_data_index):
     for index, row in ccr_data_index.iterrows():
         ccNum = row['ccNum']  # Access the ccNum from the current row
         try:
-            # Assign regions based on the numeric value of ccNum
-            if 1 <= ccNum <= 12:
-                region = 'north'
-            elif 13 <= ccNum <= 24:
-                region = 'east'
-            elif 25 <= ccNum <= 36:
-                region = 'south'
-            elif 37 <= ccNum <= 48:
-                region = 'west'
-            else:
-                region = 'unknown'  # Fallback for numbers outside the expected range
+            # Check if regionName is 'wsmr' (case-insensitive)
+            if region_name.lower() == 'wsmr':
+                # Assign regions based on the numeric value of ccNum
+                if 1 <= ccNum <= 12:
+                    region = 'north'
+                elif 13 <= ccNum <= 24:
+                    region = 'east'
+                elif 25 <= ccNum <= 36:
+                    region = 'south'
+                elif 37 <= ccNum <= 48:
+                    region = 'west'
+                else:
+                    region = 'unknown'  # Fallback for numbers outside the expected range
             
-            ccNumRegionAll.append((ccNum, region, region_axes.get(region, None)))  # Append ccNum, region, and axes
+                ccNumRegionAll.append((ccNum, region, region_axes.get(region, None)))  # Append ccNum, region, and axes
+            else:
+                # For other region names, assign AR + the first character of ccNum
+                ccNumRegionAll.append(('AR' + str(ccNum)))  # Assuming ccNum is a string
+
         except ValueError as e:
             print(f"Error: {e}")
             ccNumRegionAll.append((ccNum, 'unknown', None))  # Append unknown region
@@ -118,12 +124,11 @@ def find_ccr_regions(ccr_data_index):
     return ccNumRegions
 
 # Plot the data
-def plot_selection_data(gt_data_corrected, gt_data, ccr_truth_data, region_name):
+def plot_selection_data(gt_data, ccr_truth_data, region_name):
     """
     Plot various data related to ground truth, CCR data, and selection regions.
 
     Args:
-        gt_data_corrected (pandas.DataFrame): Ground truth data with corrected coordinates.
         gt_data (pandas.DataFrame): Ground truth data with raw coordinates.
         ccr_truth_data (pandas.DataFrame): Data of CCR truth points.
         region_name (str): The region name (e.g., 'WSMR') for plotting limits and labels.
@@ -135,17 +140,17 @@ def plot_selection_data(gt_data_corrected, gt_data, ccr_truth_data, region_name)
     minY, maxY = ccr_truth_data['ccrY'].min() - 20, ccr_truth_data['ccrY'].max() + 20
     minAlt, maxAlt = 1160, 1175
     
-    fig = plt.figure()
+    fig = plt.figure(figsize=(10, 9))
     ax1 = plt.subplot2grid((2, 3), (0, 0), colspan=3)
-    scatter_plot = ax1.scatter(gt_data_corrected['UTM Northing'], gt_data_corrected['Altitude'], s=1)
+    scatter_plot = ax1.scatter(gt_data['gt_y'], gt_data['gt_z'], s=1)
     ax1.set_xlabel(ccr_truth_data['ylabelStr'].iloc[0])  # Accessing the first element
     ax1.set_ylabel('Altitude (m)')
     ax1.grid(True)
     if region_name.lower() == 'wsmr':
         plt.axis([minY, maxY, minAlt, maxAlt])
-    ax1.set_title('Scatter Plot of UTM Northings vs Altitude')
+    ax1.set_title('Sideview Plot of Photons')
 
-    ax2 = plt.subplot2grid((2, 3), (1, 0))
+    ax2 = plt.subplot2grid((2, 3), (1, 1))
     ax2.scatter(ccr_truth_data['ccrX'], ccr_truth_data['ccrY'], color='red', edgecolor='red')
     ax2.scatter(gt_data['gt_x'], gt_data['gt_y'], color='lime', s=1)
     for i, name in enumerate(ccr_truth_data['ccrNames']):
@@ -156,24 +161,7 @@ def plot_selection_data(gt_data_corrected, gt_data, ccr_truth_data, region_name)
     if region_name.lower() == 'wsmr':
         ax2.set_ylim(minY, maxY)
     ax2.grid(True)
-    ax2.set_title('ATL03 Uncorrected')
-
-    ax3 = plt.subplot2grid((2, 3), (1, 2))
-    ax3.scatter(ccr_truth_data['ccrX'], ccr_truth_data['ccrY'], color='red', edgecolor='red')
-    ax3.scatter(gt_data_corrected['UTM Easting'], gt_data_corrected['UTM Northing'], color='green', s=1)
-    for i, name in enumerate(ccr_truth_data['ccrNames']):
-        ccrName = '#' + name[3:] if region_name.lower() == 'wsmr' else name
-        ax3.text(ccr_truth_data['ccrX'].iloc[i], ccr_truth_data['ccrY'].iloc[i], ccrName, fontsize=5.5, ha='left', clip_on=True)
-    ax3.set_xlabel(ccr_truth_data['xlabelStr'].iloc[0])  # Accessing the first element
-    ax3.set_ylabel(ccr_truth_data['ylabelStr'].iloc[0])  # Accessing the first element
-    if region_name.lower() == 'wsmr':
-        ax3.set_ylim(minY, maxY)
-    ax3.grid(True)
-    ax3.set_title('ATL03 Corrected')
-
-    if ax1.get_xlim():
-        ax3.sharex(ax2)
-        ax3.sharey(ax2)
+    ax2.set_title('Top-Down View', fontsize=10)
 
     def sync_xlimits(event):
         ax2.set_ylim(ax1.get_xlim())
@@ -183,30 +171,29 @@ def plot_selection_data(gt_data_corrected, gt_data, ccr_truth_data, region_name)
     
     return fig, ax1, scatter_plot
 
-def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correction, results, output_dir, plot_data_list):
+def plot_figures(ccr_data_index, ccr_truth_data, gt_data, results, output_dir, plot_data_list, region_name):
     """
     Plots multiple figures to visualize and analyze the data, including ground truth, CCR data, and error analysis.
 
     Args:
         ccr_data_index (pandas.DataFrame): DataFrame containing CCR data including ground truth, ccrNum, and related fields.
         ccr_truth_data (pandas.DataFrame): DataFrame containing CCR truth data such as coordinates and labels.
-        gt_data_corrected (pandas.DataFrame): DataFrame containing corrected ground track data (e.g., UTM coordinates and altitude).
-        utm_correction (tuple): Tuple of UTM corrections (dx, dy, dz) to apply to CCR data.
+        gt_data (pandas.DataFrame): DataFrame containing ground track data (e.g., UTM coordinates and altitude).
         results (numpy.ndarray): Results array with estimated footprint diameters and associated error metrics.
         output_dir (str): Directory to save the generated plots.
         plot_data_list (dict): Dictionary containing plot data for individual CCR returns and other information for histogram plotting.
 
     """
     # Apply UTM correction to ground track data
-    measData_x = gt_data_corrected['UTM Easting']
-    measData_y = gt_data_corrected['UTM Northing']
-    measData_z = gt_data_corrected['Altitude']
+    measData_x = gt_data['gt_x']
+    measData_y = gt_data['gt_y']
+    measData_z = gt_data['gt_z']
 
     # Prepare for plotting all CCR and ground data in fig3 and fig4
     ccArray = np.empty((0, 2))
 
     # Find the regions for each CCR and extract plot limits from the first valid region
-    ccNumRegions = find_ccr_regions(ccr_data_index)
+    ccNumRegions = find_ccr_regions(region_name, ccr_data_index)
     first_valid_region = ccNumRegions['region_axes'].dropna().iloc[0]  # Get the first valid region
     x_limits = first_valid_region['x']
     y_limits = first_valid_region['y']
@@ -217,13 +204,9 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
         ccrData = row['ccrData']
         groundData = row['groundData']
 
-        # Apply UTM correction to CCR data
-        ccrData[:, 0] = ccrData[:, 0] + utm_correction[1]  # Correcting y
-        ccrData[:, 1] = ccrData[:, 1] + utm_correction[2]  # Correcting z
-
         # --- Plot 2: Plot Height Data for each CCR ---
         fig2 = plt.figure()
-        plt.plot(gt_data_corrected['UTM Northing'], gt_data_corrected['Altitude'], 'y.', label='All Points')
+        plt.plot(gt_data['gt_y'], gt_data['gt_z'], 'y.', label='All Points')
         plt.plot(ccrData[:, 0], ccrData[:, 1], 'r.', label=f'CCR Data (CCR {ccNum})')
         plt.plot(groundData[:, 0], groundData[:, 1], 'b.', label='Ground Data')
         plt.grid(True)
@@ -244,8 +227,6 @@ def plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correcti
 
         # Apply UTM correction to CCR data
         corrected_ccrData = np.copy(ccrData)
-        corrected_ccrData[:, 0] = corrected_ccrData[:, 0] + utm_correction[1]  # Correcting y
-        corrected_ccrData[:, 1] = corrected_ccrData[:, 1] + utm_correction[2]  # Correcting z
         ccArray = np.vstack((ccArray, ccrData))
 
         # Find the indices where both y and z match in measData and ccArray

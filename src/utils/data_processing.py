@@ -9,20 +9,6 @@ from pyproj import Transformer, Proj
 from pathlib import Path as PathlibPath
 import h5py
 
-# Load and process lidar data
-def load_lidar_data(lidar_mat_file):
-    """
-    Load lidar data from a MAT-file.
-
-    Args:
-        lidar_mat_file (str): The path to the MAT-file containing lidar data.
-
-    Returns:
-        dict or None: Loaded MAT-file data if the file exists, otherwise None.
-    """
-    file_path = PathlibPath(lidar_mat_file)
-    return scipy.io.loadmat(lidar_mat_file) if file_path.is_file() else None
-
 # Read data from the HDF5 file
 def read_and_transform_data(h5_file_path, gt_num, lidar_mat_file):
     """
@@ -40,9 +26,6 @@ def read_and_transform_data(h5_file_path, gt_num, lidar_mat_file):
             - pd.DataFrame: Original ground truth data with uncorrected UTM coordinates.
             - list: UTM corrections [easting correction, northing correction, vertical correction].
     """
-    mat_data = load_lidar_data(lidar_mat_file)
-    utm_correction = [0, 0, 0] if not mat_data else [eastingCorrection, northingCorrection, verticalCorrection]
-
     with h5py.File(h5_file_path, 'r') as file:
         lats = np.array(file[f'/{gt_num}/heights/lat_ph'])
         lons = np.array(file[f'/{gt_num}/heights/lon_ph'])
@@ -56,23 +39,14 @@ def read_and_transform_data(h5_file_path, gt_num, lidar_mat_file):
     )
     
     utme_uncorrected, utmn_uncorrected = transformer.transform(lons, lats)
-    utme_corrected = utme_uncorrected + utm_correction[0]
-    utmn_corrected = utmn_uncorrected + utm_correction[1]
-    alt_corrected = z + utm_correction[2]
 
-    gt_data_corrected = pd.DataFrame({
-        'UTM Easting': utme_corrected,
-        'UTM Northing': utmn_corrected,
-        'Altitude': alt_corrected
-    })
-    
     gt_data = pd.DataFrame({
         'gt_x': utme_uncorrected,
         'gt_y': utmn_uncorrected,
         'gt_z': z,
         'gt_trackDirection': track_direction
     })
-    return gt_data_corrected, gt_data, utm_correction
+    return gt_data
 
 # Load CCR truth data
 def load_ccr_truth_data(region_name):
