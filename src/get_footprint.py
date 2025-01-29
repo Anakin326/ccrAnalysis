@@ -13,12 +13,12 @@ from scipy.stats import norm
 from scipy.interpolate import interp1d
 
 # Local application/library imports
-from utils.data_processing import load_lidar_data, read_and_transform_data, load_ccr_truth_data, get_interp_x
+from utils.data_processing import read_and_transform_data, load_ccr_truth_data, get_interp_x
 from utils.plotting import SelectFromCollection, makeCircle, plot_selection_data, plot_figures, find_ccr_regions
 from utils.file_io import import_from_hdf5, export_to_hdf5
 
 # Handle user selections
-def handle_selections(fig, ax1, scatter_plot, gt_data_corrected, ccr_truth_data):
+def handle_selections(fig, ax1, scatter_plot, gt_data, ccr_truth_data):
     """
     Handles the selection of points on a scatter plot and stores data for ground and CCR (Control Check Range) points.
 
@@ -30,7 +30,7 @@ def handle_selections(fig, ax1, scatter_plot, gt_data_corrected, ccr_truth_data)
         fig (matplotlib.figure.Figure): The figure object containing the plot.
         ax1 (matplotlib.axes.Axes): The axes object for plotting.
         scatter_plot (matplotlib.collections.PathCollection): The scatter plot from which the user selects points.
-        gt_data_corrected (pandas.DataFrame): Ground truth data for matching selected points.
+        pandas.DataFrame): Ground truth data for matching selected points.
         ccr_truth_data (pandas.DataFrame): Data containing known CCR locations and heights.
 
     Returns:
@@ -70,9 +70,9 @@ def handle_selections(fig, ax1, scatter_plot, gt_data_corrected, ccr_truth_data)
                 return
 
             selected_utm_northings = selected_points[:, 0]
-            matching_rows = gt_data_corrected[gt_data_corrected['UTM Northing'].isin(selected_utm_northings)]
-            mean_utm_easting = matching_rows['UTM Easting'].mean()
-            mean_utm_northing = matching_rows['UTM Northing'].mean()
+            matching_rows = gt_data[gt_data['gt_y'].isin(selected_utm_northings)]
+            mean_utm_easting = matching_rows['gt_x'].mean()
+            mean_utm_northing = matching_rows['gt_y'].mean()
 
             if current_selection_type == 0:  # CCR points
                 mean_CCR = selected_points[:, 1].mean()
@@ -139,7 +139,7 @@ def handle_selections(fig, ax1, scatter_plot, gt_data_corrected, ccr_truth_data)
 
     return ccr_data_index
 
-def get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data, utm_correction):
+def get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data):
     """
     Calculate the offsets between the ground truth data and the CCR (Control Check Range) data.
 
@@ -152,7 +152,6 @@ def get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data, utm_correctio
         gt_data (pandas.DataFrame): Ground truth data, including coordinates ('gt_x', 'gt_y', 'gt_z').
         r_nominal (float): Nominal radius, used in offset calculations.
         ccr_truth_data (pandas.DataFrame): DataFrame containing true CCR locations.
-        utm_correction (float): UTM correction to apply during calculations.
 
     Returns:
         tuple: Contains the following:
@@ -651,7 +650,7 @@ def get_combos(cc_Struct_dict, centroidSides, ccrX_truthRot_dict, ccrY_truthRot_
 
     return combo_array, combo_arrayPred    
 
-def get_footprint(ccr_data_index, gt_data, utm_correction, ccr_truth_data, footprint_range, output_dir):
+def get_footprint(ccr_data_index, gt_data, ccr_truth_data, footprint_range, output_dir, region_name):
     """
     This function computes and plots footprint information for a set of centroid data (CCR) and Ground Track (GT) data, 
     using various footprint diameters. The results include both actual and predicted footprints, as well as various 
@@ -663,7 +662,6 @@ def get_footprint(ccr_data_index, gt_data, utm_correction, ccr_truth_data, footp
         ccr_data_index (pd.DataFrame): DataFrame containing information about the CCR data, including positions 
                                         and offsets.
         gt_data (pd.DataFrame): DataFrame containing the ground track data (easting and northing coordinates).
-        utm_correction (dict): Dictionary containing UTM correction values for the data (not used directly in this code).
         ccr_truth_data (pd.DataFrame): DataFrame containing the ground truth data for CCR positions and names.
         footprint_range (str): A string representing the range of footprint diameters in the format 'start:step:end'.
         output_dir (str): Directory where the resulting plot image will be saved.
@@ -689,7 +687,7 @@ def get_footprint(ccr_data_index, gt_data, utm_correction, ccr_truth_data, footp
         print("\n")
         
         # Assuming plot_ccr_footprints_ant is a defined function that returns multiple outputs
-        results_temp, combo_arrayPred, cc_Struct_dict, direction, plot_data_list = get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data, utm_correction)
+        results_temp, combo_arrayPred, cc_Struct_dict, direction, plot_data_list = get_offset(ccr_data_index, gt_data, r_nominal, ccr_truth_data)
         # Append the temporary results for this diameter to the results list
         results.append(results_temp)    
     
@@ -713,7 +711,7 @@ def get_footprint(ccr_data_index, gt_data, utm_correction, ccr_truth_data, footp
     e_shift_pred = results[min_row_index, 1]  # Column 1 for Easting shift
     n_shift_pred = results[min_row_index, 2]  # Column 2 for Northing shift
     
-    ccNumRegions = find_ccr_regions(ccr_data_index)
+    ccNumRegions = find_ccr_regions(region_name, ccr_data_index)
     first_valid_region = ccNumRegions['region_axes'].dropna().iloc[0]  # Get the first valid region
     x_limits = first_valid_region['x']
     y_limits = first_valid_region['y']
@@ -869,19 +867,19 @@ def full_output(h5_file_path, gt_num, region_name, footprint_range, imported_h5=
 
     if run_select_data:
         # Full data processing
-        gt_data_corrected, gt_data, utm_correction = read_and_transform_data(h5_file_path, gt_num, lidar_mat_file)
+        gt_data = read_and_transform_data(h5_file_path, gt_num, lidar_mat_file)
         ccr_truth_data = load_ccr_truth_data(region_name)
 
         # Plot the data using the plot_data function
-        fig, ax1, scatter_plot = plot_selection_data(gt_data_corrected, gt_data, ccr_truth_data, region_name)
+        fig, ax1, scatter_plot = plot_selection_data(gt_data, ccr_truth_data, region_name)
 
         # Handle user selections
-        ccr_data_index = handle_selections(fig, ax1, scatter_plot, gt_data_corrected, ccr_truth_data)
+        ccr_data_index = handle_selections(fig, ax1, scatter_plot, gt_data, ccr_truth_data)
 
         # Pass output_dir to get_footprint
-        results, plot_data_list = get_footprint(ccr_data_index, gt_data, utm_correction, ccr_truth_data, footprint_range, output_dir)
+        results, plot_data_list = get_footprint(ccr_data_index, gt_data, ccr_truth_data, footprint_range, output_dir, region_name)
 
-        plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correction, results, output_dir, plot_data_list)
+        plot_figures(ccr_data_index, ccr_truth_data, gt_data, results, output_dir, plot_data_list, region_name)
 
         hdf5_filename = os.path.join(output_dir, f'ccrData_{date_str}.h5')
         export_to_hdf5(ccr_data_index, hdf5_filename)
@@ -891,13 +889,13 @@ def full_output(h5_file_path, gt_num, region_name, footprint_range, imported_h5=
         ccr_data_index = import_from_hdf5(imported_h5)  # Example file path
         
         # Re-run necessary data processing steps
-        gt_data_corrected, gt_data, utm_correction = read_and_transform_data(h5_file_path, gt_num, lidar_mat_file)
+        gt_data = read_and_transform_data(h5_file_path, gt_num, lidar_mat_file)
         ccr_truth_data = load_ccr_truth_data(region_name)
 
         # Pass output_dir to get_footprint
-        results, plot_data_list = get_footprint(ccr_data_index, gt_data, utm_correction, ccr_truth_data, footprint_range, output_dir)
+        results, plot_data_list = get_footprint(ccr_data_index, gt_data, ccr_truth_data, footprint_range, output_dir, region_name)
 
-        plot_figures(ccr_data_index, ccr_truth_data, gt_data_corrected, utm_correction, results, output_dir, plot_data_list)
+        plot_figures(ccr_data_index, ccr_truth_data, gt_data, results, output_dir, plot_data_list, region_name)
 
         hdf5_filename = os.path.join(output_dir, f'ccrData_{date_str}.h5')
         export_to_hdf5(ccr_data_index, hdf5_filename)
